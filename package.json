@@ -20,5 +20,8 @@
   "repository": {
     "type": "git",
     "url": "your-repo-url"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
   }
 }

@@ -568,29 +568,65 @@
             }
         };
 
-        // Storage Manager (uses localStorage for persistence)
-        class StorageManager {
-            static save(key, data) {
+        // API Client for Notes
+        class NotesAPIClient {
+            constructor(basePath = '/api/notes') {
+                this.basePath = basePath;
+            }
+
+            async _fetch(url, options = {}) {
                 try {
-                    localStorage.setItem(key, JSON.stringify(data));
-                    return true;
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'Request failed with status ' + response.status }));
+                        console.error('API Error:', response.status, errorData);
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+                    if (response.status === 204) { // No Content
+                        return null;
+                    }
+                    return await response.json();
                 } catch (error) {
-                    console.error('Storage save error:', error);
-                    alert('Could not save data to local storage. It might be full or disabled.');
-                    return false;
+                    console.error('Fetch API Error:', error);
+                    throw error; // Re-throw to be caught by caller
                 }
             }
 
-            static load(key, defaultValue = []) {
-                try {
-                    const data = localStorage.getItem(key);
-                    return data ? JSON.parse(data) : defaultValue;
-                } catch (error) {
-                    console.error('Storage load error:', error);
-                    return defaultValue;
-                }
+            async getAllNotes() {
+                return this._fetch(this.basePath);
+            }
+
+            async addNote(note) {
+                return this._fetch(this.basePath, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(note)
+                });
+            }
+
+            async deleteNote(noteId) {
+                return this._fetch(`${this.basePath}?id=${noteId}`, {
+                    method: 'DELETE'
+                });
+            }
+
+            async deleteAllNotes() {
+                return this._fetch(this.basePath, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'deleteAll' })
+                });
+            }
+
+            async importNotes(notesArray) { // This maps to POST /api/notes with an array (batch replace)
+                return this._fetch(this.basePath, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(notesArray)
+                });
             }
         }
+
 
         // AI Service
         class AIService {
