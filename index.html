@@ -552,7 +552,7 @@
             // The old key was automatically suspended by Google because it was shared.
             // You MUST generate a new key and put it here.
             // ========================================================================
-            GEMINI_API_KEY: 'AIzaSyDhPnB5_uE167GOvU_bDAPljAT_ZQrK3WA', 
+            GEMINI_API_KEY: 'AIzaSyBoGTS5PBc0qdIe5jtmQ_1_vYr4xdshxss', 
             GEMINI_API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent'
         };
 
@@ -565,6 +565,26 @@
                 const temp = document.createElement('div');
                 temp.textContent = str;
                 return temp.innerHTML;
+            }
+        };
+
+        // Storage Manager for local data persistence
+        const StorageManager = {
+            save: (key, data) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                } catch (error) {
+                    console.error('Failed to save to localStorage:', error);
+                }
+            },
+            load: (key) => {
+                try {
+                    const data = localStorage.getItem(key);
+                    return data ? JSON.parse(data) : [];
+                } catch (error) {
+                    console.error('Failed to load from localStorage:', error);
+                    return [];
+                }
             }
         };
 
