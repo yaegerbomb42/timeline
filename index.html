@@ -724,16 +724,17 @@
         // Timeline Application
         class TimelineApp {
             constructor() {
-                this.notes = StorageManager.load(CONFIG.STORAGE_KEY);
-                this.filteredNotes = this.notes;
+                this.notes = [];
+                this.filteredNotes = [];
                 this.isAiMode = false;
                 this.isAdminLoggedIn = false;
                 this.ai = new AIService(CONFIG.GEMINI_API_KEY);
+                this.apiClient = new NotesAPIClient();
                 
                 this.initializeElements();
                 this.setupEventListeners();
                 this.initializeAI();
-                this.render();
+                this.loadNotes();
             }
 
             initializeElements() {
@@ -803,6 +804,66 @@
                 this.elements.aiStatus.className = `ai-status ${status}`;
             }
 
+            async loadNotes() {
+                try {
+                    this.notes = await this.apiClient.getAllNotes();
+                    this.filteredNotes = this.notes;
+                    this.render();
+                } catch (error) {
+                    console.error('Failed to load notes from database:', error);
+                    // Fallback to localStorage for migration
+                    this.notes = StorageManager.load(CONFIG.STORAGE_KEY);
+                    this.filteredNotes = this.notes;
+                    
+                    // If we have local storage data, migrate it to the database
+                    if (this.notes.length > 0) {
+                        try {
+                            await this.migrateLocalStorageToDatabase();
+                        } catch (migrationError) {
+                            console.error('Failed to migrate localStorage to database:', migrationError);
+                            // Continue with localStorage data
+                            this.render();
+                        }
+                    } else {
+                        this.render();
+                    }
+                }
+            }
+
+            async migrateLocalStorageToDatabase() {
+                console.log('Migrating localStorage data to database...');
+                try {
+                    // Add date_text and time_text fields if missing
+                    const notesWithFormattedDates = this.notes.map(note => {
+                        if (!note.date_text || !note.time_text) {
+                            const date = new Date(note.timestamp);
+                            return {
+                                ...note,
+                                date_text: note.date || utils.formatDate(date),
+                                time_text: note.time || utils.formatTime(date)
+                            };
+                        }
+                        return {
+                            ...note,
+                            date_text: note.date,
+                            time_text: note.time
+                        };
+                    });
+                    
+                    await this.apiClient.importNotes(notesWithFormattedDates);
+                    console.log('Migration successful! Clearing localStorage...');
+                    
+                    // Clear localStorage after successful migration
+                    localStorage.removeItem(CONFIG.STORAGE_KEY);
+                    
+                    // Reload from database to confirm
+                    await this.loadNotes();
+                } catch (error) {
+                    console.error('Migration failed:', error);
+                    throw error;
+                }
+            }
+
             toggleMode() {
                 this.isAiMode = !this.isAiMode;
                 this.elements.modeToggle.innerHTML = this.isAiMode 
@@ -828,14 +889,20 @@
                     id: utils.generateId(),
                     content: utils.sanitizeHTML(content),
                     timestamp: now.toISOString(),
-                    date: utils.formatDate(now),
-                    time: utils.formatTime(now)
+                    date_text: utils.formatDate(now),
+                    time_text: utils.formatTime(now)
                 };
-                this.notes.push(note);
-                this.saveNotes();
-                this.applyCurrentFilter();
-                this.render();
-                setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+                
+                // Add to database
+                this.apiClient.addNote(note).then(() => {
+                    // Reload from database to get updated list
+                    return this.loadNotes();
+                }).then(() => {
+                    setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+                }).catch(error => {
+                    console.error('Failed to add note to database:', error);
+                    alert('Failed to save note. Please try again.');
+                });
             }
 
             async handleAIQuery(query) {
@@ -856,14 +923,15 @@
             }
 
             saveNotes() {
-                StorageManager.save(CONFIG.STORAGE_KEY, this.notes);
+                // No longer needed - using database storage
+                // Keeping method for compatibility
             }
 
             handleSearch(query) {
                 const lowerCaseQuery = query.toLowerCase();
                 this.filteredNotes = this.notes.filter(note => 
                     note.content.toLowerCase().includes(lowerCaseQuery) ||
-                    note.date.includes(lowerCaseQuery)
+                    (note.date_text || note.date || '').includes(lowerCaseQuery)
                 );
                 this.render();
             }
@@ -875,10 +943,12 @@
             
             deleteNote(id) {
                 if (confirm('Are you sure you want to delete this note?')) {
-                    this.notes = this.notes.filter(note => note.id !== id);
-                    this.saveNotes();
-                    this.applyCurrentFilter();
-                    this.render();
+                    this.apiClient.deleteNote(id).then(() => {
+                        return this.loadNotes();
+                    }).catch(error => {
+                        console.error('Failed to delete note:', error);
+                        alert('Failed to delete note. Please try again.');
+                    });
                 }
             }
 
@@ -892,7 +962,7 @@
                         <div class="timeline-dot"></div>
                         <div class="timeline-content">
                             ${this.isAdminLoggedIn ? `<button class="delete-btn" onclick="app.deleteNote('${note.id}')"><i class="fas fa-times"></i></button>` : ''}
-                            <div class="timestamp">${note.date} - ${note.time}</div>
+                            <div class="timestamp">${note.date_text || note.date} - ${note.time_text || note.time}</div>
                             <div class="note-content">${note.content.replace(/\n/g, '<br>')}</div>
                         </div>
                     </div>
@@ -927,10 +997,12 @@
 
             clearAllNotes() {
                 if (confirm('DANGER: This will delete ALL notes permanently. This cannot be undone. Are you absolutely sure?')) {
-                    this.notes = [];
-                    this.saveNotes();
-                    this.applyCurrentFilter();
-                    this.render();
+                    this.apiClient.deleteAllNotes().then(() => {
+                        return this.loadNotes();
+                    }).catch(error => {
+                        console.error('Failed to clear all notes:', error);
+                        alert('Failed to clear notes. Please try again.');
+                    });
                 }
             }
 
@@ -956,11 +1028,21 @@
                         const importedNotes = JSON.parse(e.target.result);
                         if (Array.isArray(importedNotes) && importedNotes.every(n => n.id && n.content && n.timestamp)) {
                             if (confirm('This will replace your current timeline with the imported data. Are you sure?')) {
-                                this.notes = importedNotes;
-                                this.saveNotes();
-                                this.applyCurrentFilter();
-                                this.render();
-                                alert('Timeline imported successfully!');
+                                // Ensure imported notes have the right field names
+                                const notesWithFormattedDates = importedNotes.map(note => ({
+                                    ...note,
+                                    date_text: note.date_text || note.date,
+                                    time_text: note.time_text || note.time
+                                }));
+                                
+                                this.apiClient.importNotes(notesWithFormattedDates).then(() => {
+                                    return this.loadNotes();
+                                }).then(() => {
+                                    alert('Timeline imported successfully!');
+                                }).catch(error => {
+                                    console.error('Failed to import timeline:', error);
+                                    alert('Failed to import timeline. Please try again.');
+                                });
                             }
                         } else {
                             alert('Invalid file format. Please import a valid timeline JSON file.');

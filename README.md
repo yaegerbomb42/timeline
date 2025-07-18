@@ -10,7 +10,7 @@ A beautiful, interactive 3D timeline application with AI integration powered by 
 - 🔍 Real-time search functionality
 - 🔐 Admin panel for advanced management
 - 📱 Fully responsive design
-- 💾 Local storage persistence
+- 💾 Database persistence (SQLite/PostgreSQL)
 - 📤 Export/Import timeline data
 
 ## Live Demo
@@ -19,15 +19,31 @@ Deploy this project on Vercel for instant hosting.
 
 ## Setup
 
-1. **Get a Gemini API Key**:
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Database Setup**:
+   - **Local Development**: No setup needed - SQLite database is created automatically
+   - **Production**: Set `POSTGRES_URL` environment variable for PostgreSQL (see [DATABASE_SETUP.md](DATABASE_SETUP.md) for details)
+
+3. **Get a Gemini API Key** (Optional for AI features):
    - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
    - Create a new API key
    - Replace the placeholder in the `CONFIG.GEMINI_API_KEY` field in `index.html`
 
-2. **Deploy to Vercel**:
+4. **Run the Application**:
+   ```bash
+   npm run dev
+   ```
+   The application will start on `http://localhost:3000`
+
+5. **Deploy to Vercel**:
    - Fork this repository
    - Connect your GitHub account to Vercel
    - Import this project
+   - Add a Vercel Postgres database in the Storage tab
    - Deploy automatically
 
 ## Usage
@@ -62,13 +78,17 @@ const CONFIG = {
 
 - Change the default admin credentials before deployment
 - Keep your Gemini API key secure
-- The app uses client-side storage only
+- The app now uses database storage for persistence across devices
+- SQLite is used for local development, PostgreSQL for production
 
 ## Technologies Used
 
 - HTML5
 - CSS3 (Advanced animations & 3D transforms)
 - Vanilla JavaScript
+- Node.js & Express (API server)
+- SQLite (local development database)
+- PostgreSQL (production database)
 - Tailwind CSS
 - Font Awesome Icons
 - Google Gemini AI API

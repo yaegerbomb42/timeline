@@ -2,10 +2,11 @@
   "name": "ultra-3d-timeline",
   "version": "1.0.0",
   "description": "A beautiful, interactive 3D timeline application with AI integration",
-  "main": "index.html",
+  "main": "server.js",
   "scripts": {
-    "dev": "python3 -m http.server 3000",
-    "start": "python3 -m http.server 8000"
+    "dev": "node server.js",
+    "start": "node server.js",
+    "static": "python3 -m http.server 8000"
   },
   "keywords": [
     "timeline",
@@ -22,6 +23,10 @@
     "url": "your-repo-url"
   },
   "dependencies": {
-    "pg": "^8.16.3"
+    "better-sqlite3": "^12.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pg": "^8.16.3",
+    "sqlite3": "^5.1.7"
   }
 }
