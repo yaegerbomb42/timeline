@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultra 3D Timeline with Gemini AI</title>
+    <title>Timeline</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
@@ -460,7 +460,7 @@
             </div>
 
             <!-- Header -->
-            <h1 class="header-title">Ultra 3D Timeline</h1>
+            <h1 class="header-title">Timeline</h1>
             
             <!-- Search Section -->
             <div class="floating-card">
@@ -661,8 +661,8 @@
                     return false;
                 }
                 try {
-                    const response = await this.makeRequest('Hello, respond with just the single word "Connected".');
-                    this.isConnected = response.trim().toLowerCase().includes('connected');
+                    const response = await this.makeRequest('Respond with just "OK"');
+                    this.isConnected = response.trim().toLowerCase().includes('ok');
                     return this.isConnected;
                 } catch (error) {
                     console.error('AI connection test failed:', error);
@@ -682,10 +682,10 @@
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 1024,
+                            temperature: 0.4,
+                            topK: 20,
+                            topP: 0.8,
+                            maxOutputTokens: 512,
                         }
                     })
                 });
@@ -706,16 +706,27 @@
             }
 
             async queryWithContext(query, notes) {
-                const context = notes.length > 0 
-                    ? `Here are some of the most recent notes from the user's timeline:\n` + notes.slice(-10).map(note => `- On ${note.date} at ${note.time}, they noted: "${note.content}"`).join('\n')
-                    : 'The user has no notes in their timeline yet.';
+                const recentNotes = notes.slice(-15); // Get last 15 notes for context
+                const context = recentNotes.length > 0 
+                    ? `Timeline Context (most recent entries):\n` + recentNotes.map((note, index) => 
+                        `${index + 1}. ${note.date_text || note.date} at ${note.time_text || note.time}: "${note.content}"`
+                    ).join('\n')
+                    : 'Timeline Status: No entries yet.';
 
-                const prompt = `You are a helpful and encouraging AI assistant for a timeline application.
-                ${context}
+                const prompt = `You are an AI assistant for a personal timeline application. Based on the user's timeline entries, provide helpful, relevant, and concise responses.
 
-                Based on this context, the user has asked the following: "${query}"
+${context}
 
-                Please provide a helpful, concise, and insightful response. Address the user directly. If the query is unrelated to their timeline, gently guide them back or answer generally.`;
+User Query: "${query}"
+
+Instructions:
+- Keep responses focused and concise (2-3 sentences max)
+- Reference specific timeline entries when relevant
+- If the query is about patterns, trends, or insights, analyze the timeline data
+- If the query is unrelated to the timeline, acknowledge it briefly and offer timeline-related assistance
+- Be encouraging and supportive
+
+Response:`;
                 
                 return await this.makeRequest(prompt);
             }
