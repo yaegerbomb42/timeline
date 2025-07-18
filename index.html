@@ -676,33 +676,29 @@
                     throw new Error('API key not configured. Please set it in the CONFIG object.');
                 }
 
-                const response = await fetch(`${CONFIG.GEMINI_API_URL}?key=${this.apiKey}`, {
+                // Use the backend proxy to avoid CORS issues
+                const response = await fetch('/api/ai', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 1024,
-                        }
+                        prompt: prompt,
+                        apiKey: this.apiKey
                     })
                 });
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API request failed: ${response.status} - ${errorText}`);
+                    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+                    throw new Error(`API request failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
                 }
 
                 const data = await response.json();
                 
-                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-                    console.error('Invalid response from API:', data);
-                    throw new Error('Invalid response format from API');
+                if (!data.response) {
+                    console.error('Invalid response from proxy API:', data);
+                    throw new Error('Invalid response format from proxy API');
                 }
                 
-                return data.candidates[0].content.parts[0].text;
+                return data.response;
             }
 
             async queryWithContext(query, notes) {
