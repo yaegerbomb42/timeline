@@ -22,6 +22,18 @@ For production deployment (e.g., on Vercel), the application automatically switc
 4. Vercel will automatically set the `POSTGRES_URL` environment variable
 5. Deploy your application - the database will be created automatically
 
+#### Neon Database Setup:
+1. Create a Neon database at [neon.tech](https://neon.tech)
+2. Copy the connection string from your Neon dashboard
+3. Set the `POSTGRES_URL` environment variable:
+```bash
+# For local development, create a .env file:
+echo 'POSTGRES_URL=postgres://neondb_owner:your_password@your-host-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require' > .env
+
+# For production deployment, set as environment variable:
+export POSTGRES_URL="postgres://neondb_owner:your_password@your-host-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+```
+
 #### Manual PostgreSQL Setup:
 Set the `POSTGRES_URL` environment variable with your database connection string:
 ```bash

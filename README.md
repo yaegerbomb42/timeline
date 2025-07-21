@@ -26,7 +26,8 @@ Deploy this project on Vercel for instant hosting.
 
 2. **Database Setup**:
    - **Local Development**: No setup needed - SQLite database is created automatically
-   - **Production**: Set `POSTGRES_URL` environment variable for PostgreSQL (see [DATABASE_SETUP.md](DATABASE_SETUP.md) for details)
+   - **Production with Neon**: Set `POSTGRES_URL` environment variable (see [Quick Setup](#quick-setup-with-neon-database) below)
+   - **Production with other PostgreSQL**: Set `POSTGRES_URL` environment variable (see [DATABASE_SETUP.md](DATABASE_SETUP.md) for details)
 
 3. **Get a Gemini API Key** (Optional for AI features):
    - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
@@ -38,6 +39,28 @@ Deploy this project on Vercel for instant hosting.
    npm run dev
    ```
    The application will start on `http://localhost:3000`
+
+## Quick Setup with Neon Database
+
+For production deployment with Neon PostgreSQL database:
+
+1. **Copy environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Configure Neon database**:
+   Edit `.env` and set your Neon connection string:
+   ```bash
+   POSTGRES_URL=postgres://neondb_owner:your_password@your-host-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+   ```
+
+3. **Deploy or run locally**:
+   ```bash
+   npm run dev
+   ```
+
+The application will automatically detect the PostgreSQL connection and use Neon database for storage.
 
 5. **Deploy to Vercel**:
    - Fork this repository
