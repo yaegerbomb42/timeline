@@ -217,6 +217,27 @@
             margin-bottom: 3rem;
             transform-style: preserve-3d;
             animation: itemFloat 8s ease-in-out infinite;
+            transition: margin-left 0.3s, transform 0.5s, opacity 0.4s;
+            opacity: 1;
+        }
+        .timeline-item.fade-in {
+            animation: fadeInSlideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes fadeInSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .timeline-item:hover {
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.08);
+            z-index: 2;
+            background: #f3f4f6;
+            transition: box-shadow 0.2s, background 0.2s;
         }
 
         .timeline-item:nth-child(even) {
@@ -286,6 +307,31 @@
                 transform: translateX(-50%) translateZ(80px) scale(1.2);
                 box-shadow: 0 0 30px rgba(74, 144, 226, 0.8);
             }
+        }
+
+        .timeline-content {
+            position: relative;
+        }
+        .timeline-tooltip {
+            display: none;
+            position: absolute;
+            left: 110%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #222;
+            color: #fff;
+            padding: 0.7rem 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            white-space: pre-line;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            pointer-events: none;
+            z-index: 10;
+            min-width: 220px;
+            max-width: 350px;
+        }
+        .timeline-item:hover .timeline-tooltip {
+            display: block;
         }
 
         .timestamp {
@@ -425,6 +471,75 @@
             transform: translateZ(50px);
         }
 
+        .error-message {
+            color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #ef4444;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .retry-btn {
+            background-color: #f97316;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+
+        .retry-btn:hover {
+            background-color: #ea580c;
+        }
+
+        .timeline-view-switcher {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        #timelineViewSelect {
+            padding: 0.3rem 0.7rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+        .timeline.stagger-day .timeline-item {
+            margin-left: calc(var(--stagger) * 30px);
+            transition: margin-left 0.3s;
+        }
+        .timeline.stagger-week .timeline-item {
+            margin-left: calc(var(--stagger) * 60px);
+            transition: margin-left 0.3s;
+        }
+        .timeline.stagger-month .timeline-item {
+            margin-left: calc(var(--stagger) * 90px);
+            transition: margin-left 0.3s;
+        }
+        .timeline.\33 d .timeline-item {
+            transform: perspective(600px) rotateY(var(--stagger3d, 0deg));
+            transition: transform 0.5s;
+        }
+        .timeline.\33 d {
+            perspective: 600px;
+        }
+        .timeline-group-header {
+            font-size: 1.08rem;
+            font-weight: 600;
+            color: #6366f1;
+            background: #eef2ff;
+            padding: 0.4rem 1.2rem;
+            border-radius: 8px;
+            margin: 1.2rem 0 0.5rem 0;
+            display: inline-block;
+            box-shadow: 0 1px 4px rgba(99,102,241,0.08);
+        }
+
         @media (max-width: 768px) {
             .header-title {
                 font-size: 2.5rem;
@@ -444,6 +559,61 @@
             .timeline-item:nth-child(even) .timeline-dot,
             .timeline-item:nth-child(odd) .timeline-dot {
                 left: 2rem;
+            }
+        }
+        @media (max-width: 768px) {
+            .timeline-view-switcher {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.2rem;
+                font-size: 0.98rem;
+            }
+            #timelineViewSelect {
+                width: 100%;
+                font-size: 1rem;
+                margin-top: 0.2rem;
+            }
+            .timeline-group-header {
+                font-size: 1rem;
+                padding: 0.3rem 0.7rem;
+                margin: 0.8rem 0 0.3rem 0;
+            }
+            .timeline-item {
+                margin-left: 0 !important;
+                min-width: 0;
+                font-size: 0.98rem;
+                padding: 0.7rem 0.7rem 0.7rem 1.2rem;
+            }
+            .timeline-dot {
+                left: -10px;
+                width: 14px;
+                height: 14px;
+            }
+            .timeline-content {
+                padding-left: 0.2rem;
+            }
+            .timeline-tooltip {
+                left: 100%;
+                min-width: 140px;
+                max-width: 220px;
+                font-size: 0.92rem;
+                padding: 0.5rem 0.7rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .timeline-group-header {
+                font-size: 0.97rem;
+                padding: 0.22rem 0.5rem;
+            }
+            .timeline-item {
+                font-size: 0.93rem;
+                padding: 0.5rem 0.4rem 0.5rem 0.7rem;
+            }
+            .timeline-tooltip {
+                min-width: 90px;
+                max-width: 140px;
+                font-size: 0.88rem;
+                padding: 0.3rem 0.5rem;
             }
         }
     </style>
@@ -505,7 +675,16 @@
             <!-- Timeline -->
             <div class="timeline-container">
                 <div class="timeline-spine"></div>
-                <div id="timeline"></div>
+                <div class="timeline-view-switcher">
+                    <label for="timelineViewSelect">Timeline View:</label>
+                    <select id="timelineViewSelect">
+                        <option value="stagger-day">Stagger by Day</option>
+                        <option value="stagger-week">Stagger by Week</option>
+                        <option value="stagger-month">Stagger by Month</option>
+                        <option value="3d">3D Effect</option>
+                    </select>
+                </div>
+                <div id="timeline" class="timeline"></div>
             </div>
             
             <div id="noResults" class="no-results hidden">
@@ -540,6 +719,7 @@
         </div>
         
         <input type="file" id="importFile" accept=".json" style="display: none;">
+        <div id="errorBox" class="hidden error-message"></div>
     </div>
 
     <script>
@@ -741,7 +921,9 @@ Response:`;
                 this.isAdminLoggedIn = false;
                 this.ai = new AIService(CONFIG.GEMINI_API_KEY);
                 this.apiClient = new NotesAPIClient();
-                
+                this.lastError = null;
+                this.retryAction = null;
+                this.timelineView = localStorage.getItem('timelineView') || 'stagger-day';
                 this.initializeElements();
                 this.setupEventListeners();
                 this.initializeAI();
@@ -763,7 +945,8 @@ Response:`;
                     adminControls: document.getElementById('adminControls'),
                     aiStatus: document.getElementById('aiStatus'),
                     aiStatusText: document.getElementById('aiStatusText'),
-                    importFile: document.getElementById('importFile')
+                    importFile: document.getElementById('importFile'),
+                    errorBox: document.getElementById('errorBox')
                 };
             }
 
@@ -792,6 +975,12 @@ Response:`;
                     if (!this.elements.adminPanel.contains(e.target) && !this.elements.adminBtn.contains(e.target)) {
                         this.elements.adminPanel.classList.remove('active');
                     }
+                });
+                document.getElementById('timelineViewSelect').value = this.timelineView;
+                document.getElementById('timelineViewSelect').addEventListener('change', (e) => {
+                    this.timelineView = e.target.value;
+                    localStorage.setItem('timelineView', this.timelineView);
+                    this.render();
                 });
             }
 
@@ -903,16 +1092,14 @@ Response:`;
                     date_text: utils.formatDate(now),
                     time_text: utils.formatTime(now)
                 };
-                
-                // Add to database
                 this.apiClient.addNote(note).then(() => {
-                    // Reload from database to get updated list
                     return this.loadNotes();
                 }).then(() => {
                     setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+                    this.hideError();
                 }).catch(error => {
                     console.error('Failed to add note to database:', error);
-                    alert('Failed to save note. Please try again.');
+                    this.showError('Failed to save note. Please try again.', () => this.addNote(content));
                 });
             }
 
@@ -956,9 +1143,11 @@ Response:`;
                 if (confirm('Are you sure you want to delete this note?')) {
                     this.apiClient.deleteNote(id).then(() => {
                         return this.loadNotes();
+                    }).then(() => {
+                        this.hideError();
                     }).catch(error => {
                         console.error('Failed to delete note:', error);
-                        alert('Failed to delete note. Please try again.');
+                        this.showError('Failed to delete note. Please try again.', () => this.deleteNote(id));
                     });
                 }
             }
@@ -967,17 +1156,86 @@ Response:`;
                 this.filteredNotes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 const hasSearchQuery = this.elements.searchInput.value.length > 0;
                 this.elements.noResults.classList.toggle('hidden', !(this.filteredNotes.length === 0 && hasSearchQuery));
-                
-                this.elements.timeline.innerHTML = this.filteredNotes.map(note => `
-                    <div class="timeline-item fade-in" id="note-${note.id}">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            ${this.isAdminLoggedIn ? `<button class="delete-btn" onclick="app.deleteNote('${note.id}')"><i class="fas fa-times"></i></button>` : ''}
-                            <div class="timestamp">${note.date_text || note.date} - ${note.time_text || note.time}</div>
-                            <div class="note-content">${note.content.replace(/\n/g, '<br>')}</div>
+                // Group notes for staggered views
+                let staggerMap = {};
+                let getStagger = (note) => 0;
+                let groupKeyFn = null;
+                let groupLabelFn = null;
+                if (this.timelineView === 'stagger-day') {
+                    staggerMap = {};
+                    getStagger = (note) => {
+                        const day = (note.date_text || note.date);
+                        staggerMap[day] = (staggerMap[day] || 0) + 1;
+                        return (staggerMap[day] - 1) % 3; // 3 stagger levels
+                    };
+                    groupKeyFn = (note) => note.date_text || note.date;
+                    groupLabelFn = (key) => key;
+                } else if (this.timelineView === 'stagger-week') {
+                    staggerMap = {};
+                    getStagger = (note) => {
+                        const week = (note.date_text || note.date).slice(0, 7); // YYYY-MM
+                        staggerMap[week] = (staggerMap[week] || 0) + 1;
+                        return (staggerMap[week] - 1) % 4; // 4 stagger levels
+                    };
+                    groupKeyFn = (note) => {
+                        const d = new Date(note.timestamp);
+                        const year = d.getFullYear();
+                        const week = Math.ceil((((d - new Date(year,0,1)) / 86400000) + new Date(year,0,1).getDay()+1)/7);
+                        return `${year}-W${week.toString().padStart(2,'0')}`;
+                    };
+                    groupLabelFn = (key) => `Week ${key.split('-W')[1]}, ${key.split('-W')[0]}`;
+                } else if (this.timelineView === 'stagger-month') {
+                    staggerMap = {};
+                    getStagger = (note) => {
+                        const month = (note.date_text || note.date).slice(0, 7); // YYYY-MM
+                        staggerMap[month] = (staggerMap[month] || 0) + 1;
+                        return (staggerMap[month] - 1) % 5; // 5 stagger levels
+                    };
+                    groupKeyFn = (note) => (note.date_text || note.date).slice(0, 7);
+                    groupLabelFn = (key) => {
+                        const [year, month] = key.split('-');
+                        return `${year} - ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(month,10)-1]}`;
+                    };
+                } else if (this.timelineView === '3d') {
+                    getStagger = (note, idx) => idx * 10; // 10deg per note
+                }
+                // Set timeline class
+                this.elements.timeline.className = 'timeline ' + this.timelineView;
+                // Render notes with group headers
+                let html = '';
+                let lastGroupKey = null;
+                this.filteredNotes.forEach((note, idx) => {
+                    let style = '';
+                    if (this.timelineView === '3d') {
+                        style = `--stagger3d: ${getStagger(note, idx)}deg;`;
+                    } else {
+                        style = `--stagger: ${getStagger(note, idx)};`;
+                    }
+                    // Group header
+                    let groupHeader = '';
+                    if (groupKeyFn && groupLabelFn) {
+                        const groupKey = groupKeyFn(note);
+                        if (groupKey !== lastGroupKey) {
+                            groupHeader = `<div class=\"timeline-group-header\">${groupLabelFn(groupKey)}</div>`;
+                            lastGroupKey = groupKey;
+                        }
+                    }
+                    // Tooltip content
+                    const tooltip = `<div class=\"timeline-tooltip\">${note.content.replace(/\n/g, '<br>')}<br><br><span style=\"font-size:0.92em;opacity:0.7;\">${note.date_text || note.date} ${note.time_text || note.time}</span></div>`;
+                    html += `
+                        ${groupHeader}
+                        <div class=\"timeline-item fade-in\" id=\"note-${note.id}\" style=\"${style}\">
+                            <div class=\"timeline-dot\"></div>
+                            <div class=\"timeline-content\">
+                                ${this.isAdminLoggedIn ? `<button class=\"delete-btn\" onclick=\"app.deleteNote('${note.id}')\"><i class=\"fas fa-times\"></i></button>` : ''}
+                                <div class=\"timestamp\">${note.date_text || note.date} - ${note.time_text || note.time}</div>
+                                <div class=\"note-content\">${note.content.replace(/\n/g, '<br>')}</div>
+                                ${tooltip}
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                });
+                this.elements.timeline.innerHTML = html;
             }
             
             toggleAdminPanel() {
@@ -1011,6 +1269,8 @@ Response:`;
                     // Try body method first
                     this.apiClient.deleteAllNotes().then(() => {
                         return this.loadNotes();
+                    }).then(() => {
+                        this.hideError();
                     }).catch(error => {
                         console.error('Failed to clear all notes with body method, trying query param fallback:', error);
                         // Fallback to query param method
@@ -1018,9 +1278,11 @@ Response:`;
                             method: 'DELETE'
                         }).then(() => {
                             return this.loadNotes();
+                        }).then(() => {
+                            this.hideError();
                         }).catch(error2 => {
                             console.error('Failed to clear notes with both methods:', error2);
-                            alert('Failed to clear notes. Please try again.');
+                            this.showError('Failed to clear notes. Please try again.', () => this.clearAllNotes());
                         });
                     });
                 }
@@ -1074,6 +1336,26 @@ Response:`;
                 };
                 reader.readAsText(file);
                 event.target.value = null;
+            }
+
+            showError(message, retryAction) {
+                this.lastError = message;
+                this.retryAction = retryAction || null;
+                this.elements.errorBox.innerHTML = `<div class="error-message">${message}</div>` + (retryAction ? `<button class="retry-btn">Retry</button>` : '');
+                this.elements.errorBox.classList.remove('hidden');
+                if (retryAction) {
+                    this.elements.errorBox.querySelector('.retry-btn').onclick = () => {
+                        this.elements.errorBox.classList.add('hidden');
+                        this.lastError = null;
+                        this.retryAction = null;
+                        retryAction();
+                    };
+                }
+            }
+            hideError() {
+                this.elements.errorBox.classList.add('hidden');
+                this.lastError = null;
+                this.retryAction = null;
             }
         }
 
