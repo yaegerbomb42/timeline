@@ -103,6 +103,7 @@ module.exports = async (req, res) => {
       res.status(200).json(notes);
     } else if (req.method === 'POST') {
       // Add a new note or batch import
+      console.log('POST body:', req.body);
       const notesData = req.body;
 
       if (Array.isArray(notesData)) { // Batch import / replace all
@@ -128,22 +129,24 @@ module.exports = async (req, res) => {
       }
     } else if (req.method === 'DELETE') {
       // For deleting a single note by ID from query parameter: DELETE /api/notes?id=<NOTE_ID>
+      console.log('DELETE query:', req.query);
+      console.log('DELETE body:', req.body);
       const noteId_queryParam = req.query.id;
-
       // For deleting all notes via a specific action in the body: DELETE /api/notes with body {"action": "deleteAll"}
+      // Also allow via query param: /api/notes?action=deleteAll
       const action_body = req.body ? req.body.action : null;
-
+      const action_query = req.query.action;
       if (noteId_queryParam) {
         const result = await db.deleteNote(noteId_queryParam);
         if (result.changes === 0) {
           return res.status(404).json({ error: 'Note not found' });
         }
         res.status(200).json({ message: 'Note deleted successfully', id: noteId_queryParam });
-      } else if (action_body === 'deleteAll') {
+      } else if (action_body === 'deleteAll' || action_query === 'deleteAll') {
         await db.deleteAllNotes();
         res.status(200).json({ message: 'All notes deleted successfully' });
       } else {
-        res.status(400).json({ error: 'Invalid DELETE request. Specify note ID as a query parameter (e.g., ?id=xxx) or action in body (e.g., {"action": "deleteAll"}).' });
+        res.status(400).json({ error: 'Invalid DELETE request. Specify note ID as a query parameter (e.g., ?id=xxx) or action in body (e.g., {"action": "deleteAll"}) or as a query param (e.g., ?action=deleteAll).' });
       }
     } else {
       res.setHeader('Allow', ['GET', 'POST', 'DELETE']);

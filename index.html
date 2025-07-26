@@ -1008,11 +1008,20 @@ Response:`;
 
             clearAllNotes() {
                 if (confirm('DANGER: This will delete ALL notes permanently. This cannot be undone. Are you absolutely sure?')) {
+                    // Try body method first
                     this.apiClient.deleteAllNotes().then(() => {
                         return this.loadNotes();
                     }).catch(error => {
-                        console.error('Failed to clear all notes:', error);
-                        alert('Failed to clear notes. Please try again.');
+                        console.error('Failed to clear all notes with body method, trying query param fallback:', error);
+                        // Fallback to query param method
+                        fetch(this.apiClient.basePath + '?action=deleteAll', {
+                            method: 'DELETE'
+                        }).then(() => {
+                            return this.loadNotes();
+                        }).catch(error2 => {
+                            console.error('Failed to clear notes with both methods:', error2);
+                            alert('Failed to clear notes. Please try again.');
+                        });
                     });
                 }
             }
