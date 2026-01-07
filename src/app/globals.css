@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f1e7;
+  --paper-2: #efe7d8;
+  --ink: #1f1e1a;
+  --ink-2: #353126;
+  --muted: #6b6457;
+  --brass: #b08d57;
+  --brass-2: #8d6e3e;
+  --line: rgba(31, 30, 26, 0.12);
+  --shadow: rgba(18, 13, 7, 0.12);
+  --ring: rgba(176, 141, 87, 0.35);
+}
+
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-book);
+  --font-mono: var(--font-code);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 800px at 10% -20%, rgba(176, 141, 87, 0.12), transparent 60%),
+    radial-gradient(900px 700px at 90% 0%, rgba(31, 30, 26, 0.08), transparent 55%),
+    radial-gradient(1200px 900px at 50% 120%, rgba(176, 141, 87, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  color: var(--ink);
+  font-family: var(--font-book), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+::selection {
+  background: rgba(176, 141, 87, 0.24);
+}
+
+/* Subtle “paper grain” without image assets */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(31, 30, 26, 0.02) 0px,
+    rgba(31, 30, 26, 0.02) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+}
