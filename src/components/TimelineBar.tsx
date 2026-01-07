@@ -73,8 +73,6 @@ export function TimelineBar({
     return `${format(a, "LLL yyyy")} → ${format(b, "LLL yyyy")}`;
   }, [days]);
 
-  const maxMarks = slotWidth < 18 ? 4 : slotWidth < 26 ? 6 : 10;
-
   return (
     <div className="px-6 py-5">
       <div className="flex items-center justify-between gap-4">
@@ -118,8 +116,10 @@ export function TimelineBar({
                 idx % labelStride === 0 ||
                 isNewMonth;
 
-              const marks = day.chats.slice(0, maxMarks);
-              const extra = day.chats.length - marks.length;
+              const marks = day.chats;
+              const stackMax = 66; // px of vertical space reserved for marks
+              const gapPx = Math.max(2, Math.min(6, Math.floor(stackMax / Math.max(1, marks.length))));
+              const dotPx = Math.max(3, Math.min(7, gapPx + 1));
 
               return (
                 <div
@@ -138,7 +138,10 @@ export function TimelineBar({
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-7 h-2 w-px bg-[var(--line)]" />
 
                   {/* Marks stack */}
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-9 flex flex-col items-center gap-[5px] pb-2">
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 bottom-9 flex flex-col items-center pb-2"
+                    style={{ gap: `${gapPx}px` }}
+                  >
                     <AnimatePresence initial={false}>
                       {marks.map((c) => (
                         <motion.button
@@ -167,20 +170,15 @@ export function TimelineBar({
                             ease: [0.22, 1, 0.36, 1],
                           }}
                           className={cn(
-                            "h-[7px] w-[7px] rounded-full",
+                            "rounded-full",
                             "bg-[color:var(--ink)]/70 hover:bg-[color:var(--ink)]",
                             "focus:outline-none focus:ring-4 focus:ring-[var(--ring)]",
                             c.id === newestChatId ? "bg-[color:var(--brass-2)]" : "",
                           )}
+                          style={{ width: dotPx, height: dotPx }}
                         />
                       ))}
                     </AnimatePresence>
-
-                    {extra > 0 ? (
-                      <div className="text-[10px] font-mono text-[color:var(--muted)] select-none">
-                        +{extra}
-                      </div>
-                    ) : null}
                   </div>
 
                   {/* Day label */}
