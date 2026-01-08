@@ -10,6 +10,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 
@@ -97,6 +98,10 @@ export async function addChat(uid: string, text: string) {
   }
 
   return ref.id;
+}
+
+export async function deleteChat(uid: string, chatId: string) {
+  await deleteDoc(doc(db, "users", uid, "chats", chatId));
 }
 
 export function useChats(uid?: string) {

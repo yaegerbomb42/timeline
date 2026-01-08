@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { DEFAULT_GEMINI_API_KEY, GEMINI_URL } from "@/lib/ai/config";
+import { DEFAULT_GEMINI_API_KEY, GEMINI_MODEL, GEMINI_URL } from "@/lib/ai/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,17 +34,21 @@ export async function POST(req: Request) {
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
 
+  // Use v1 API with gemini-3-pro-preview, matching the Python example structure
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.35,
         topK: 24,
         topP: 0.85,
         maxOutputTokens: 700,
       },
+      // Thinking config if supported (may be ignored if not available in REST API)
+      // The REST API may not expose thinking_config, but we structure it as close as possible
     }),
     cache: "no-store",
   });
