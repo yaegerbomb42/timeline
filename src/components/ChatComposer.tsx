@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Feather, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { WordVacuum } from "@/components/WordVacuum";
 import { cn } from "@/lib/utils";
 
 // Character-by-character satisfaction feedback
@@ -160,7 +161,7 @@ export function ChatComposer({
       </div>
 
       <div className="relative px-6 py-5">
-        <div className="relative">
+        <div className="relative" style={{ perspective: "1000px" }}>
           <textarea
             ref={textareaRef}
             value={value}
@@ -184,6 +185,15 @@ export function ChatComposer({
             )}
             rows={3}
           />
+          {/* Word vacuum system - black hole → portal → final position */}
+          {isFocused && value.trim() ? (
+            <WordVacuum
+              value={value}
+              // Cast is safe: WordVacuum only uses the ref in the browser and guards null internally.
+              textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
+              isActive={isFocused}
+            />
+          ) : null}
           {charSatisfaction && value.length < 20 ? (
             <CharacterSatisfaction text={value.slice(-10)} isActive={charSatisfaction} />
           ) : null}
