@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
-import { DEFAULT_GEMINI_API_KEY, GEMINI_MODEL, GEMINI_URL } from "@/lib/ai/config";
+import { DEFAULT_GEMINI_API_KEY, GEMINI_MODEL } from "@/lib/ai/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,12 +10,6 @@ type Body = {
   query?: string;
   context?: string;
 };
-
-function pickText(data: any) {
-  const parts = data?.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(parts)) return "";
-  return parts.map((p: any) => String(p?.text ?? "")).join("");
-}
 
 export async function POST(req: Request) {
   let body: Body;
@@ -34,39 +29,54 @@ export async function POST(req: Request) {
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
 
-  // Use v1beta API with Gemini 3 Pro
-  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+  try {
+    const ai = new GoogleGenAI({
+      apiKey,
+    });
+
+    const config = {
+      thinkingConfig: {
+        thinkingLevel: "HIGH",
+      },
       generationConfig: {
         temperature: 0.35,
         topK: 24,
         topP: 0.85,
         maxOutputTokens: 700,
-        // Gemini 3 supports thinking_level parameter
-        thinkingLevel: "MEDIUM",
       },
-    }),
-    cache: "no-store",
-  });
+    };
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
+    const contents = [
+      {
+        role: "user",
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ];
+
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      config,
+      contents,
+    });
+
+    const text = response.text?.trim() || "";
+    if (!text) {
+      return NextResponse.json({ error: "Empty AI response." }, { status: 502 });
+    }
+
+    return NextResponse.json({ text });
+  } catch (error: any) {
+    const errorMessage = error?.message || String(error);
+    const errorDetails = errorMessage.slice(0, 1800);
     return NextResponse.json(
-      { error: "AI request failed.", status: res.status, details: text.slice(0, 1800) },
-      { status: res.status },
+      { error: "AI request failed.", details: errorDetails },
+      { status: 500 },
     );
   }
-
-  const data = await res.json().catch(() => ({}));
-  const text = pickText(data).trim();
-  if (!text) {
-    return NextResponse.json({ error: "Empty AI response." }, { status: 502 });
-  }
-
-  return NextResponse.json({ text });
 }
 
 
