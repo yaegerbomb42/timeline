@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
 
-  // Use v1 API with gemini-3-pro-preview, matching the Python example structure
+  // Use v1 API with gemini-1.5-pro
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
