@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 import { DEFAULT_GEMINI_API_KEY, GEMINI_MODEL } from "@/lib/ai/config";
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     const config = {
       thinkingConfig: {
-        thinkingLevel: "HIGH",
+        thinkingLevel: ThinkingLevel.HIGH,
       },
       temperature: 0.35,
       topK: 24,
