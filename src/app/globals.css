@@ -1,21 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f6f1e7;
-  --paper-2: #efe7d8;
-  --ink: #1f1e1a;
-  --ink-2: #353126;
-  --muted: #6b6457;
-  --brass: #b08d57;
-  --brass-2: #8d6e3e;
-  --line: rgba(31, 30, 26, 0.12);
-  --shadow: rgba(18, 13, 7, 0.12);
-  --ring: rgba(176, 141, 87, 0.35);
+  /* Aurora-inspired vibrant palette */
+  --aurora-1: #00f5ff;
+  --aurora-2: #7b2ff7;
+  --aurora-3: #ff006e;
+  --aurora-4: #8338ec;
+  --aurora-5: #3a86ff;
+  --neon-cyan: #00f5ff;
+  --neon-purple: #8338ec;
+  --neon-pink: #ff006e;
+  --neon-blue: #3a86ff;
+  
+  /* Dynamic backgrounds */
+  --bg-deep: #0a0a1a;
+  --bg-surface: #0f0f23;
+  --bg-elevated: #151530;
+  
+  /* Text colors */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a8d0;
+  --text-muted: #6b6b9a;
+  
+  /* Accent glows */
+  --glow-cyan: rgba(0, 245, 255, 0.4);
+  --glow-purple: rgba(131, 56, 236, 0.4);
+  --glow-pink: rgba(255, 0, 110, 0.4);
+  --glow-blue: rgba(58, 134, 255, 0.4);
+  
+  /* Legacy mappings for compatibility */
+  --paper: var(--bg-surface);
+  --paper-2: var(--bg-elevated);
+  --ink: var(--text-primary);
+  --ink-2: var(--text-secondary);
+  --muted: var(--text-muted);
+  --brass: var(--neon-cyan);
+  --brass-2: var(--neon-purple);
+  --line: rgba(160, 168, 208, 0.15);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --ring: var(--glow-cyan);
 }
 
 @theme inline {
-  --color-background: var(--paper);
-  --color-foreground: var(--ink);
+  --color-background: var(--bg-deep);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-ui);
   --font-serif: var(--font-book);
   --font-mono: var(--font-code);
@@ -24,35 +52,105 @@
 html,
 body {
   height: 100%;
+  overflow-x: hidden;
 }
 
 body {
-  background:
-    radial-gradient(1200px 800px at 10% -20%, rgba(176, 141, 87, 0.12), transparent 60%),
-    radial-gradient(900px 700px at 90% 0%, rgba(31, 30, 26, 0.08), transparent 55%),
-    radial-gradient(1200px 900px at 50% 120%, rgba(176, 141, 87, 0.08), transparent 55%),
-    linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
-  color: var(--ink);
-  font-family: var(--font-book), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  background: 
+    radial-gradient(ellipse 120% 80% at 20% -10%, var(--glow-purple) 0%, transparent 50%),
+    radial-gradient(ellipse 100% 70% at 80% 10%, var(--glow-cyan) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, var(--glow-pink) 0%, transparent 50%),
+    radial-gradient(ellipse 110% 90% at 10% 50%, var(--glow-blue) 0%, transparent 50%),
+    linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-surface) 50%, var(--bg-deep) 100%);
+  background-size: 200% 200%;
+  background-attachment: fixed;
+  animation: auroraShift 20s ease infinite;
+  color: var(--text-primary);
+  font-family: var(--font-ui), system-ui, -apple-system, sans-serif;
+  position: relative;
 }
 
-::selection {
-  background: rgba(176, 141, 87, 0.24);
+@keyframes auroraShift {
+  0%, 100% {
+    background-position: 0% 0%, 100% 0%, 50% 100%, 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%, 0% 100%, 50% 0%, 100% 0%;
+  }
 }
 
-/* Subtle “paper grain” without image assets */
+/* Animated particle overlay */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: repeating-linear-gradient(
-    115deg,
-    rgba(31, 30, 26, 0.02) 0px,
-    rgba(31, 30, 26, 0.02) 1px,
-    transparent 1px,
-    transparent 6px
-  );
-  opacity: 0.35;
-  mix-blend-mode: multiply;
+  background-image: 
+    radial-gradient(2px 2px at 20% 30%, rgba(0, 245, 255, 0.3), transparent),
+    radial-gradient(2px 2px at 60% 70%, rgba(131, 56, 236, 0.3), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(255, 0, 110, 0.2), transparent),
+    radial-gradient(1px 1px at 80% 10%, rgba(58, 134, 255, 0.2), transparent),
+    radial-gradient(2px 2px at 90% 40%, rgba(0, 245, 255, 0.15), transparent);
+  background-size: 200% 200%, 150% 150%, 180% 180%, 120% 120%, 160% 160%;
+  animation: particleFloat 25s ease-in-out infinite;
+  opacity: 0.6;
+  mix-blend-mode: screen;
+}
+
+@keyframes particleFloat {
+  0%, 100% {
+    background-position: 0% 0%, 100% 0%, 50% 50%, 0% 100%, 100% 100%;
+  }
+  50% {
+    background-position: 100% 100%, 0% 100%, 50% 0%, 100% 0%, 0% 0%;
+  }
+}
+
+/* Pulsing glow effect */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, var(--glow-cyan) 0%, transparent 70%);
+  animation: pulseGlow 8s ease-in-out infinite;
+  opacity: 0.1;
+  filter: blur(100px);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.15;
+  }
+}
+
+::selection {
+  background: var(--glow-cyan);
+  color: var(--bg-deep);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--neon-cyan), var(--neon-purple));
+  border-radius: 10px;
+  border: 2px solid var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--neon-purple), var(--neon-pink));
 }

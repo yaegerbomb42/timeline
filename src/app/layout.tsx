@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Inter, Newsreader } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Orbitron } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -9,9 +9,10 @@ const fontUi = Inter({
   display: "swap",
 });
 
-const fontBook = Newsreader({
+const fontBook = Orbitron({
   variable: "--font-book",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
 });
 
@@ -23,8 +24,8 @@ const fontCode = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Timeline",
-  description: "A time‑bound story, written one entry at a time.",
+  title: "Timeline | Living Memory",
+  description: "A vibrant chronicle of existence—each moment pulses with energy.",
 };
 
 export default function RootLayout({

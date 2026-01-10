@@ -2,24 +2,25 @@
 
 import { format } from "date-fns";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
-import { Bookmark, Clock3, Trash2 } from "lucide-react";
+import { Bookmark, Clock3, Trash2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";
 
-const WORD_DELAY = 32;
-const CHAR_DELAY = 24;
+const WORD_DELAY = 28;
+const CHAR_DELAY = 20;
 
-// Particle effect generator for entry creation satisfaction
-function ParticleBurst({ x, y, count = 12 }: { x: number; y: number; count?: number }) {
+// Enhanced particle burst with neon colors
+function ParticleBurst({ x, y, count = 20 }: { x: number; y: number; count?: number }) {
   const particles = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
       id: i,
       angle: (i / count) * Math.PI * 2,
-      distance: 28 + Math.random() * 20,
-      duration: 0.6 + Math.random() * 0.3,
-      delay: Math.random() * 0.15,
+      distance: 35 + Math.random() * 25,
+      duration: 0.8 + Math.random() * 0.4,
+      delay: Math.random() * 0.2,
+      color: i % 3 === 0 ? "var(--neon-cyan)" : i % 3 === 1 ? "var(--neon-purple)" : "var(--neon-pink)",
     }));
   }, [count]);
 
@@ -31,11 +32,15 @@ function ParticleBurst({ x, y, count = 12 }: { x: number; y: number; count?: num
       {particles.map((p) => (
         <motion.div
           key={p.id}
-          className="absolute h-1.5 w-1.5 rounded-full bg-[color:var(--brass-2)]"
+          className="absolute h-2 w-2 rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${p.color}, transparent)`,
+            boxShadow: `0 0 10px ${p.color}`,
+          }}
           initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
           animate={{
             opacity: [0, 1, 0],
-            scale: [0, 1.2, 0.6],
+            scale: [0, 1.5, 0.8],
             x: Math.cos(p.angle) * p.distance,
             y: Math.sin(p.angle) * p.distance,
           }}
@@ -50,7 +55,7 @@ function ParticleBurst({ x, y, count = 12 }: { x: number; y: number; count?: num
   );
 }
 
-// Word-by-word reveal component with stagger
+// Word-by-word reveal with neon glow
 function WordReveal({ text, delay = 0, onComplete }: { text: string; delay?: number; onComplete?: () => void }) {
   const words = useMemo(() => text.split(/(\s+)/).filter((w) => w.trim() || w === " "), [text]);
   const [revealed, setRevealed] = useState(0);
@@ -77,10 +82,13 @@ function WordReveal({ text, delay = 0, onComplete }: { text: string; delay?: num
         return (
           <motion.span
             key={i}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ opacity: 0, y: 6, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="inline-block"
+            style={{
+              textShadow: i === revealed - 1 ? "0 0 10px var(--glow-cyan)" : "none",
+            }}
           >
             {word}
           </motion.span>
@@ -90,7 +98,7 @@ function WordReveal({ text, delay = 0, onComplete }: { text: string; delay?: num
   );
 }
 
-// Entry card with micro-interactions
+// Immersive entry card with morphing background
 function EntryCard({
   chat,
   isHighlighted,
@@ -114,18 +122,18 @@ function EntryCard({
     if (isHighlighted && !showParticles.current) {
       showParticles.current = true;
       controls.start({
-        scale: [1, 1.02, 1],
+        scale: [1, 1.03, 1],
         boxShadow: [
-          "0 6px 24px rgba(176,141,87,0.08)",
-          "0 12px 40px rgba(176,141,87,0.25)",
-          "0 6px 24px rgba(176,141,87,0.08)",
+          "0 8px 32px rgba(0,245,255,0.2)",
+          "0 16px 48px rgba(131,56,236,0.4)",
+          "0 8px 32px rgba(0,245,255,0.2)",
         ],
-        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+        transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
       });
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect();
         setParticlePos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-        setTimeout(() => setParticlePos(null), 1000);
+        setTimeout(() => setParticlePos(null), 1200);
       }
     }
   }, [isHighlighted, controls]);
@@ -139,84 +147,110 @@ function EntryCard({
     setIsDeleting(true);
     setTimeout(() => {
       onDelete(chat.id);
-    }, 200);
+    }, 300);
   };
 
   const baseAnimate = isDeleting
-    ? { opacity: 0, y: -12, scale: 0.92, filter: "blur(4px)" }
-    : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" };
+    ? { opacity: 0, y: -20, scale: 0.9, filter: "blur(8px)", rotateX: -15 }
+    : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", rotateX: 0 };
 
   return (
     <>
       <motion.article
         ref={cardRef}
         layout
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        initial={{ opacity: 0, y: 30, scale: 0.92, rotateX: 10 }}
         animate={isHighlighted && !isDeleting ? controls : baseAnimate}
-        exit={{ opacity: 0, y: 12, scale: 0.96 }}
+        exit={{ opacity: 0, y: 20, scale: 0.92, rotateX: -10 }}
         transition={{
-          duration: 0.4,
+          duration: 0.5,
           ease: [0.22, 1, 0.36, 1],
-          layout: { duration: 0.35 },
+          layout: { duration: 0.4 },
         }}
+        whileHover={{ y: -4, scale: 1.01 }}
         id={`chat-${chat.id}`}
-        className={`
-          group relative rounded-2xl border border-[var(--line)] bg-white/70 backdrop-blur-sm
-          px-5 py-4 mx-3 my-3 shadow-[0_6px_24px_rgba(0,0,0,0.04)]
-          hover:border-[color:var(--brass-2)]/40 hover:bg-white/90 hover:shadow-[0_12px_40px_rgba(176,141,87,0.12)]
-          transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-          ${isHighlighted ? "ring-2 ring-[color:var(--brass-2)]/30 ring-offset-2" : ""}
-        `}
+        className="group relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/70 backdrop-blur-2xl px-6 py-5 mx-4 my-4 overflow-hidden"
         style={{
-          animationDelay: `${index * 0.05}s`,
+          boxShadow: isHighlighted
+            ? "0 20px 60px rgba(0,245,255,0.3), 0 0 40px rgba(131,56,236,0.2) inset"
+            : "0 12px 40px rgba(0,0,0,0.4), 0 0 20px rgba(0,245,255,0.05) inset",
         }}
       >
-        {/* Subtle divider line between entries */}
+        {/* Morphing gradient background */}
+        <motion.div
+          className="absolute inset-0 -z-10 opacity-30"
+          animate={{
+            background: [
+              "radial-gradient(circle at 0% 0%, var(--glow-cyan), transparent)",
+              "radial-gradient(circle at 100% 100%, var(--glow-purple), transparent)",
+              "radial-gradient(circle at 50% 50%, var(--glow-pink), transparent)",
+              "radial-gradient(circle at 0% 0%, var(--glow-cyan), transparent)",
+            ],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        {/* Animated border glow */}
+        <motion.div
+          className="absolute inset-0 rounded-3xl -z-10"
+          animate={{
+            boxShadow: [
+              "0 0 20px var(--glow-cyan)",
+              "0 0 30px var(--glow-purple)",
+              "0 0 20px var(--glow-cyan)",
+            ],
+          }}
+          transition={{ duration: 3, repeat: Infinity }}
+        />
+
+        {/* Divider with gradient */}
         {index > 0 ? (
           <motion.div
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
-            transition={{ delay: index * 0.03, duration: 0.4 }}
-            className="absolute -top-1.5 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-[var(--line)] to-transparent"
+            transition={{ delay: index * 0.03, duration: 0.5 }}
+            className="absolute -top-2 left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-[var(--neon-cyan)] to-transparent"
+            style={{ boxShadow: "0 0 10px var(--glow-cyan)" }}
           />
         ) : null}
 
-        {/* Header with timestamp and delete */}
-        <div className="flex items-center justify-between gap-4 mb-3">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 mb-4">
           <motion.div
-            initial={{ opacity: 0, x: -8 }}
+            initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.04, duration: 0.3 }}
-            className="inline-flex items-center gap-2 text-xs text-[color:var(--muted)] font-mono"
+            transition={{ delay: index * 0.04, duration: 0.4 }}
+            className="inline-flex items-center gap-3 text-xs text-[var(--text-secondary)] font-mono"
           >
-            <Clock3 className="h-3.5 w-3.5 opacity-70" />
-            <span>{format(chat.createdAt, "PPP p")}</span>
+            <motion.div
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            >
+              <Clock3 className="h-4 w-4 text-[var(--neon-cyan)]" />
+            </motion.div>
+            <span className="font-semibold">{format(chat.createdAt, "PPP p")}</span>
           </motion.div>
           {onDelete ? (
             <motion.button
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.04 + 0.1, duration: 0.3 }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              transition={{ delay: index * 0.04 + 0.1, duration: 0.4 }}
+              whileHover={{ scale: 1.15, rotate: 15 }}
+              whileTap={{ scale: 0.9 }}
               onClick={handleDeleteClick}
-              className="
-                opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                rounded-xl p-1.5 text-[color:var(--muted)] hover:text-[rgba(140,60,40,0.85)]
-                hover:bg-[rgba(140,60,40,0.08)] active:bg-[rgba(140,60,40,0.15)]
-              "
+              className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl p-2 text-[var(--text-secondary)] hover:text-[var(--neon-pink)] hover:bg-[var(--bg-surface)]/50"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </motion.button>
           ) : null}
         </div>
 
-        {/* Content with word-by-word reveal on new entries */}
+        {/* Content with word reveal */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: index * 0.05 + 0.15, duration: 0.4 }}
-          className="whitespace-pre-wrap text-[15px] leading-7 text-[color:var(--ink)] font-serif"
+          transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
+          className="whitespace-pre-wrap text-[16px] leading-8 text-[var(--text-primary)] font-sans"
         >
           {isHighlighted && !wordRevealComplete && index === 0 ? (
             <WordReveal text={chat.text} onComplete={() => setWordRevealComplete(true)} />
@@ -225,18 +259,18 @@ function EntryCard({
           )}
         </motion.div>
 
-        {/* Subtle shimmer effect on highlight */}
+        {/* Shimmer effect on highlight */}
         {isHighlighted ? (
           <motion.div
             initial={{ x: "-100%" }}
             animate={{ x: "200%" }}
-            transition={{ duration: 1.2, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
-            className="absolute inset-0 -z-10 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+            transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity, repeatDelay: 2.5 }}
+            className="absolute inset-0 -z-10 bg-gradient-to-r from-transparent via-white/30 to-transparent"
             style={{ clipPath: "polygon(0 0, 30% 0, 35% 100%, 0 100%)" }}
           />
         ) : null}
       </motion.article>
-      {particlePos ? <ParticleBurst x={particlePos.x} y={particlePos.y} count={16} /> : null}
+      {particlePos ? <ParticleBurst x={particlePos.x} y={particlePos.y} count={24} /> : null}
       <DeleteConfirmModal
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
@@ -261,31 +295,72 @@ export function ChatFeed({
   highlightChatId?: string | null;
 }) {
   return (
-    <div className="rounded-3xl border border-[var(--line)] bg-white/50 backdrop-blur-sm shadow-[0_14px_50px_var(--shadow)] overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8 }}
+      className="rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden"
+      style={{
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(0,245,255,0.1) inset",
+      }}
+    >
       <div className="px-6 pt-6 pb-4 border-b border-[var(--line)]">
-        <div className="flex items-center gap-2 text-[color:var(--ink)]">
-          <Bookmark className="h-4 w-4 text-[color:var(--brass-2)]" />
-          <div className="font-sans text-sm">Entries</div>
+        <div className="flex items-center gap-3 text-[var(--text-primary)]">
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          >
+            <Bookmark className="h-5 w-5 text-[var(--neon-cyan)]" />
+          </motion.div>
+          <div className="font-sans text-base font-bold">Entries</div>
         </div>
-        <div className="mt-1 text-xs text-[color:var(--muted)]">
+        <div className="mt-2 text-sm text-[var(--text-secondary)] flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 text-[var(--neon-purple)]" />
           Newest at the top, always.
         </div>
       </div>
 
-      <div className="px-0 py-3 max-h-[calc(100vh-420px)] overflow-y-auto">
+      <div className="px-0 py-4 max-h-[calc(100vh-420px)] overflow-y-auto">
         {error ? (
-          <div className="mx-3 my-3 rounded-2xl border border-[rgba(140,60,40,0.25)] bg-[rgba(140,60,40,0.06)] px-4 py-3 text-sm text-[color:var(--ink)]">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-4 my-4 rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-5 py-4 text-sm text-[var(--text-primary)]"
+            style={{
+              boxShadow: "0 0 20px rgba(255,0,110,0.3)",
+            }}
+          >
             {error}
-          </div>
+          </motion.div>
         ) : null}
 
         {loading && chats.length === 0 ? (
-          <div className="px-6 py-10 text-sm text-[color:var(--muted)]">Loading…</div>
+          <div className="px-6 py-12 text-center">
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-base text-[var(--neon-cyan)] font-book flex items-center justify-center gap-3"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <Sparkles className="h-5 w-5" />
+              </motion.div>
+              Loading…
+            </motion.div>
+          </div>
         ) : null}
 
         {!loading && chats.length === 0 ? (
-          <div className="px-6 py-10 text-sm text-[color:var(--muted)]">
-            No entries yet. Write one above and watch the line remember you.
+          <div className="px-6 py-12 text-center">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-base text-[var(--text-secondary)]"
+            >
+              No entries yet. Write one above and watch your story come alive.
+            </motion.p>
           </div>
         ) : null}
 
@@ -301,6 +376,6 @@ export function ChatFeed({
           ))}
         </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Sparkles } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
 import type { Chat } from "@/lib/chats";
@@ -17,6 +17,76 @@ type DayBucket = {
 
 function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
+}
+
+// Glowing dot with particle trail
+function GlowingDot({
+  chat,
+  isNewest,
+  isHighlighted,
+  onClick,
+  size,
+}: {
+  chat: Chat;
+  isNewest?: boolean;
+  isHighlighted?: boolean;
+  onClick?: () => void;
+  size: number;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}`}
+      initial={{ opacity: 0, scale: 0.3, y: 10 }}
+      animate={{
+        opacity: 1,
+        scale: isHighlighted ? [1, 1.3, 1] : 1,
+        y: 0,
+        boxShadow: isHighlighted
+          ? [
+              "0 0 0 0px rgba(0,245,255,0)",
+              "0 0 0 15px rgba(0,245,255,0.4)",
+              "0 0 0 8px rgba(131,56,236,0.3)",
+              "0 0 0 0px rgba(0,245,255,0)",
+            ]
+          : isNewest
+            ? "0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(131,56,236,0.4)"
+            : "0 0 10px rgba(0,245,255,0.3)",
+      }}
+      exit={{ opacity: 0, scale: 0.3, y: 10 }}
+      transition={{
+        duration: isHighlighted ? 1.5 : 0.4,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      whileHover={{ scale: 1.3, y: -2 }}
+      whileTap={{ scale: 0.9 }}
+      className={cn(
+        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-[var(--glow-cyan)]",
+        isNewest
+          ? "bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-purple)]"
+          : "bg-gradient-to-br from-[var(--neon-purple)]/80 to-[var(--neon-pink)]/80",
+      )}
+      style={{
+        width: size,
+        height: size,
+      }}
+    >
+      {isNewest && (
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.6, 0, 0.6],
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{
+            background: "radial-gradient(circle, var(--neon-cyan), transparent)",
+          }}
+        />
+      )}
+    </motion.button>
+  );
 }
 
 export function TimelineBar({
@@ -47,13 +117,13 @@ export function TimelineBar({
   const { slotWidth, trackWidth, scrollable, labelStride } = useMemo(() => {
     const width = viewport.width || 0;
     const count = days.length || 1;
-    const minSlot = 14;
-    const maxSlot = 64;
+    const minSlot = 16;
+    const maxSlot = 80;
     const ideal = width > 0 ? width / count : minSlot;
     const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
     const canScroll = width > 0 ? track > width + 1 : false;
-    const stride = Math.max(1, Math.ceil(86 / slot));
+    const stride = Math.max(1, Math.ceil(100 / slot));
     return { slotWidth: slot, trackWidth: track, scrollable: canScroll, labelStride: stride };
   }, [viewport.width, days.length]);
 
@@ -74,35 +144,67 @@ export function TimelineBar({
   }, [days]);
 
   return (
-    <div className="px-6 py-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-[color:var(--muted)] font-mono">
-          <CalendarDays className="h-3.5 w-3.5 opacity-70" />
-          <span>{rangeLabel}</span>
-        </div>
-        <div className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)] font-sans">
-          {days.length === 0 ? "" : `${days.length} day${days.length === 1 ? "" : "s"}`}
-        </div>
+    <div className="px-6 py-6">
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <motion.div
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex items-center gap-3 text-sm text-[var(--text-secondary)] font-mono"
+        >
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          >
+            <CalendarDays className="h-4 w-4 text-[var(--neon-cyan)]" />
+          </motion.div>
+          <span className="font-semibold">{rangeLabel}</span>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-xs uppercase tracking-[0.3em] text-[var(--text-secondary)] font-sans flex items-center gap-2"
+        >
+          {days.length > 0 && (
+            <>
+              <Sparkles className="h-3 w-3 text-[var(--neon-purple)]" />
+              {days.length} day{days.length === 1 ? "" : "s"}
+            </>
+          )}
+        </motion.div>
       </div>
 
       <div
         ref={viewport.ref}
         className={cn(
-          "mt-4 rounded-2xl border border-[var(--line)] bg-white/55",
+          "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
           "overflow-x-auto overscroll-x-contain",
-          scrollable ? "pb-2" : "",
+          "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
+          scrollable ? "pb-3" : "",
         )}
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
+        }}
       >
         <div
-          className="relative h-[120px]"
+          className="relative h-[140px]"
           style={{
             width: trackWidth,
             minWidth: "100%",
           }}
         >
-          {/* Baseline */}
-          <div className="absolute left-0 right-0 bottom-7 h-px bg-[var(--line)]" />
-          <div className="absolute left-0 right-0 bottom-7 h-px bg-[linear-gradient(90deg,transparent,rgba(176,141,87,0.35),transparent)] opacity-60" />
+          {/* Animated baseline with gradient */}
+          <motion.div
+            className="absolute left-0 right-0 bottom-8 h-[2px]"
+            style={{
+              background: "linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-pink), transparent)",
+              boxShadow: "0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple)",
+            }}
+            animate={{
+              opacity: [0.6, 1, 0.6],
+            }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
 
           <div className="flex h-full items-end">
             {days.map((day, idx) => {
@@ -117,77 +219,77 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const stackMax = 66; // px of vertical space reserved for marks
-              const gapPx = Math.max(2, Math.min(6, Math.floor(stackMax / Math.max(1, marks.length))));
-              const dotPx = Math.max(3, Math.min(7, gapPx + 1));
+              const stackMax = 80;
+              const gapPx = Math.max(3, Math.min(8, Math.floor(stackMax / Math.max(1, marks.length))));
+              const dotPx = Math.max(4, Math.min(10, gapPx + 2));
 
               return (
-                <div
+                <motion.div
                   key={day.dayKey}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05, duration: 0.5 }}
                   className="relative h-full"
                   style={{ width: slotWidth, flex: `0 0 ${slotWidth}px` }}
                 >
-                  {/* Month label */}
+                  {/* Month label with glow */}
                   {isNewMonth ? (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] font-sans tracking-[0.18em] uppercase text-[color:var(--muted)] whitespace-nowrap">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="absolute left-1/2 -translate-x-1/2 top-2 text-[11px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap"
+                      style={{
+                        textShadow: "0 0 10px var(--glow-cyan)",
+                      }}
+                    >
                       {format(day.date, "LLL")}
-                    </div>
+                    </motion.div>
                   ) : null}
 
-                  {/* Tick */}
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-7 h-2 w-px bg-[var(--line)]" />
+                  {/* Animated tick */}
+                  <motion.div
+                    className="absolute left-1/2 -translate-x-1/2 bottom-8 h-3 w-[2px]"
+                    style={{
+                      background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
+                      boxShadow: "0 0 5px var(--glow-cyan)",
+                    }}
+                    animate={{
+                      opacity: [0.5, 1, 0.5],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
 
-                  {/* Marks stack */}
+                  {/* Marks stack with 3D effect */}
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 bottom-9 flex flex-col items-center pb-2"
+                    className="absolute left-1/2 -translate-x-1/2 bottom-10 flex flex-col items-center pb-2"
                     style={{ gap: `${gapPx}px` }}
                   >
                     <AnimatePresence initial={false}>
-                      {marks.map((c) => (
-                        <motion.button
+                      {marks.map((c, markIdx) => (
+                        <GlowingDot
                           key={c.id}
-                          type="button"
+                          chat={c}
+                          isNewest={c.id === newestChatId}
+                          isHighlighted={c.id === highlightChatId}
                           onClick={() => onSelectChat?.(c.id)}
-                          title={`${format(c.createdAt, "PPP p")}\n\n${c.excerpt}`}
-                          initial={{ opacity: 0, scale: 0.7, y: 6 }}
-                          animate={{
-                            opacity: 1,
-                            scale: 1,
-                            y: 0,
-                            boxShadow:
-                              c.id === highlightChatId
-                                ? [
-                                    "0 0 0 0px rgba(176,141,87,0)",
-                                    "0 0 0 10px rgba(176,141,87,0.20)",
-                                    "0 0 0 6px rgba(176,141,87,0.14)",
-                                    "0 0 0 0px rgba(176,141,87,0)",
-                                  ]
-                                : "0 0 0 0px rgba(176,141,87,0)",
-                          }}
-                          exit={{ opacity: 0, scale: 0.7, y: 6 }}
-                          transition={{
-                            duration: c.id === highlightChatId ? 1.2 : 0.35,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
-                          className={cn(
-                            "rounded-full",
-                            "bg-[color:var(--ink)]/70 hover:bg-[color:var(--ink)]",
-                            "focus:outline-none focus:ring-4 focus:ring-[var(--ring)]",
-                            c.id === newestChatId ? "bg-[color:var(--brass-2)]" : "",
-                          )}
-                          style={{ width: dotPx, height: dotPx }}
+                          size={dotPx}
                         />
                       ))}
                     </AnimatePresence>
                   </div>
 
-                  {/* Day label */}
+                  {/* Day label with subtle glow */}
                   {showDayLabel ? (
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[10px] font-mono text-[color:var(--muted)] whitespace-nowrap">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.05 + 0.2 }}
+                      className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[11px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
+                    >
                       {format(day.date, "d")}
-                    </div>
+                    </motion.div>
                   ) : null}
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -196,5 +298,3 @@ export function TimelineBar({
     </div>
   );
 }
-
-
