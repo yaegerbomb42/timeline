@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
 
-  // Use v1 API with gemini-1.5-pro
+  // Use v1beta API with Gemini 3 Pro
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -45,6 +45,8 @@ export async function POST(req: Request) {
         topK: 24,
         topP: 0.85,
         maxOutputTokens: 700,
+        // Gemini 3 supports thinking_level parameter
+        thinkingLevel: "MEDIUM",
       },
     }),
     cache: "no-store",
