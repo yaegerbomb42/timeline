@@ -38,12 +38,10 @@ export async function POST(req: Request) {
       thinkingConfig: {
         thinkingLevel: "HIGH",
       },
-      generationConfig: {
-        temperature: 0.35,
-        topK: 24,
-        topP: 0.85,
-        maxOutputTokens: 700,
-      },
+      temperature: 0.35,
+      topK: 24,
+      topP: 0.85,
+      maxOutputTokens: 700,
     };
 
     const contents = [
