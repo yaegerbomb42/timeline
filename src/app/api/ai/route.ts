@@ -40,15 +40,12 @@ export async function POST(req: Request) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.35,
         topK: 24,
         topP: 0.85,
         maxOutputTokens: 700,
       },
-      // Thinking config if supported (may be ignored if not available in REST API)
-      // The REST API may not expose thinking_config, but we structure it as close as possible
     }),
     cache: "no-store",
   });
