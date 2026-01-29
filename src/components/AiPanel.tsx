@@ -54,7 +54,6 @@ function HolographicText({ children, className }: { children: React.ReactNode; c
 
 export function AiPanel({
   uid,
-  identity,
   chats,
 }: {
   uid: string;
@@ -169,22 +168,9 @@ export function AiPanel({
         };
         setChatHistory(prev => [...prev, assistantMessage]);
       }
-    } catch (err: any) {
-      setError(err?.message ?? "AI request failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-          setError("Your AI key was rejected. Re-enter it and try again.");
-          return;
-        }
-        setError(msg);
-        return;
-      }
-      const data = (await res.json()) as { text?: string };
-      setAnswer(data.text?.trim() || "(No response)");
-    } catch (err: any) {
-      setError(err?.message ?? "AI request failed.");
+    } catch (err) {
+      const error = err as Error;
+      setError(error?.message ?? "AI request failed.");
     } finally {
       setBusy(false);
     }
