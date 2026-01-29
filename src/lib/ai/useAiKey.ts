@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 export function useAiKey(uid?: string | null) {
@@ -21,7 +21,8 @@ export function useAiKey(uid?: string | null) {
     async function loadKey() {
       setLoading(true);
       try {
-        const docRef = doc(db, "users", uid, "settings", "aiConfig");
+        const settingsRef = collection(db, "users", uid, "settings");
+        const docRef = doc(settingsRef, "aiConfig");
         const docSnap = await getDoc(docRef);
         
         if (!cancelled && docSnap.exists()) {
@@ -53,7 +54,8 @@ export function useAiKey(uid?: string | null) {
     if (!uid) return;
     
     try {
-      const docRef = doc(db, "users", uid, "settings", "aiConfig");
+      const settingsRef = collection(db, "users", uid, "settings");
+      const docRef = doc(settingsRef, "aiConfig");
       if (!v) {
         // Clear the key by setting it to empty string
         await setDoc(docRef, { geminiApiKey: "" }, { merge: true });
