@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { DEFAULT_GEMINI_API_KEY } from "@/lib/ai/config";
-
 const STORAGE_PREFIX = "timeline.aiKey.v1:";
 
 function storageKey(identity: string) {
@@ -39,10 +37,6 @@ export function useAiKey(identity?: string | null) {
     }
   }
 
-  function useDefaultKey() {
-    setAiKey(DEFAULT_GEMINI_API_KEY);
-  }
-
   function clearAiKey() {
     setAiKey("");
   }
@@ -50,11 +44,9 @@ export function useAiKey(identity?: string | null) {
   return {
     aiKey,
     hydrated,
-    hasKey: Boolean(aiKey.trim()) || Boolean(DEFAULT_GEMINI_API_KEY),
+    hasKey: Boolean(aiKey.trim()),
     setAiKey,
     clearAiKey,
-    useDefaultKey,
   };
 }
-
 

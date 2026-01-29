@@ -1,13 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Wand2 } from "lucide-react";
+import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { buildTimelineContext } from "@/lib/ai/context";
 import type { MonthIndex } from "@/lib/ai/monthIndex";
 import { useMonthIndex } from "@/lib/ai/monthIndex";
 import { useAiKey } from "@/lib/ai/useAiKey";
+import { generateWithWebLLM, isWebGPUAvailable } from "@/lib/ai/webllm";
 import type { Chat } from "@/lib/chats";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ export function AiPanel({
     [months, chats],
   );
 
-  const { aiKey, hydrated, hasKey, setAiKey, clearAiKey, useDefaultKey } = useAiKey(identity);
+  const { aiKey, hydrated, hasKey, setAiKey, clearAiKey } = useAiKey(identity);
 
   const [query, setQuery] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
@@ -74,8 +75,15 @@ export function AiPanel({
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
+  const [aiMode, setAiMode] = useState<"local" | "pro">("local");
+  const [webllmProgress, setWebllmProgress] = useState<string | null>(null);
 
-  const ready = hydrated && hasKey && !needsKey;
+  // Check if WebGPU is available for WebLLM
+  const webGPUAvailable = useMemo(() => isWebGPUAvailable(), []);
+
+  // Default to Pro mode if no WebGPU and user has a key
+  const effectiveMode = !webGPUAvailable && hasKey ? "pro" : aiMode;
+  const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : hasKey) && !needsKey;
 
   async function ask() {
     const q = query.trim();
@@ -83,22 +91,49 @@ export function AiPanel({
     setError(null);
     setAnswer(null);
     setBusy(true);
+    setWebllmProgress(null);
+    
     try {
       const context = buildTimelineContext({ months: monthIndex, chats });
-      const res = await fetch("/api/ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-timeline-ai-key": aiKey,
-        },
-        body: JSON.stringify({ query: q, context }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        const msg = String(payload?.details || payload?.error || `AI request failed (${res.status}).`);
-        if (res.status === 401 || res.status === 403) {
-          clearAiKey();
-          setNeedsKey(true);
+      
+      if (effectiveMode === "local") {
+        // Use WebLLM local model
+        const response = await generateWithWebLLM(q, context, (progress) => {
+          setWebllmProgress(progress.text);
+        });
+        setAnswer(response);
+        setWebllmProgress(null);
+      } else {
+        // Use Gemini Pro API
+        const res = await fetch("/api/ai", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-timeline-ai-key": aiKey,
+          },
+          body: JSON.stringify({ query: q, context }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          const msg = String(payload?.details || payload?.error || `AI request failed (${res.status}).`);
+          if (res.status === 401 || res.status === 403) {
+            clearAiKey();
+            setNeedsKey(true);
+            setError("Your AI key was rejected. Re-enter it and try again.");
+            return;
+          }
+          setError(msg);
+          return;
+        }
+        const data = (await res.json()) as { text?: string };
+        setAnswer(data.text?.trim() || "(No response)");
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "AI request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
           setError("Your AI key was rejected. Re-enter it and try again.");
           return;
         }
@@ -173,20 +208,20 @@ export function AiPanel({
           </motion.div>
         ) : null}
 
-        {hydrated && (!hasKey || needsKey) ? (
+        {hydrated && (!hasKey || needsKey) && effectiveMode === "pro" ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
             <div className="text-sm text-[var(--text-primary)] leading-6">
-              Enter your Gemini API key once for <span className="font-mono text-[var(--neon-cyan)]">{identity}</span>.
-              If it ever stops working, you&apos;ll see this again—nothing breaks.
+              Enter your Gemini API key for <span className="font-mono text-[var(--neon-cyan)]">{identity}</span> to use Pro mode.
+              Or switch to Local mode to use WebLLM (no API key needed).
             </div>
 
             <label className="block">
               <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
-                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> AI Key
+                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> Gemini API Key
               </span>
               <motion.input
                 value={keyDraft}
@@ -201,45 +236,25 @@ export function AiPanel({
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
-              <motion.button
-                disabled={busy}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setNeedsKey(false);
-                  setError(null);
-                  setAiKey(keyDraft);
-                  setKeyDraft("");
-                }}
-                className={cn(
-                  "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
-                  "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
-                  "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
-                  "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
-                )}
-              >
-                Save key
-              </motion.button>
-              <motion.button
-                disabled={busy}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setNeedsKey(false);
-                  setError(null);
-                  // eslint-disable-next-line react-hooks/rules-of-hooks
-                  useDefaultKey();
-                }}
-                className="rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-5 py-3 font-sans text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/80 transition-all flex items-center gap-2"
-                style={{
-                  boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-                }}
-              >
-                <Wand2 className="h-4 w-4 text-[var(--neon-purple)]" />
-                Use included key
-              </motion.button>
-            </div>
+            <motion.button
+              disabled={busy}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setNeedsKey(false);
+                setError(null);
+                setAiKey(keyDraft);
+                setKeyDraft("");
+              }}
+              className={cn(
+                "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
+                "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
+                "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
+                "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
+              )}
+            >
+              Save key
+            </motion.button>
           </motion.div>
         ) : null}
 
@@ -249,22 +264,65 @@ export function AiPanel({
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
+            {/* Mode Selection */}
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-[var(--text-secondary)] font-sans">AI Mode:</div>
+              <div className="flex gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setAiMode("local")}
+                  disabled={!webGPUAvailable}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
+                    aiMode === "local" && webGPUAvailable
+                      ? "border-[var(--neon-cyan)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[0_0_20px_var(--glow-cyan)]"
+                      : "border-[var(--line)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-cyan)]",
+                    !webGPUAvailable && "opacity-50 cursor-not-allowed"
+                  )}
+                  title={!webGPUAvailable ? "WebGPU not available in your browser" : "Free local AI using WebLLM"}
+                >
+                  <Cpu className="h-3.5 w-3.5" />
+                  Local (WebLLM)
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setAiMode("pro")}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
+                    aiMode === "pro"
+                      ? "border-[var(--neon-purple)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[0_0_20px_var(--glow-purple)]"
+                      : "border-[var(--line)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-purple)]",
+                  )}
+                  title="Pro AI using Gemini (requires API key)"
+                >
+                  <Cloud className="h-3.5 w-3.5" />
+                  Pro (Gemini)
+                </motion.button>
+              </div>
+              {aiMode === "pro" && hasKey && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    clearAiKey();
+                    setNeedsKey(true);
+                  }}
+                  className="text-xs font-sans text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
+                >
+                  Change key
+                </motion.button>
+              )}
+            </div>
+
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
                 <Brain className="h-3.5 w-3.5 text-[var(--neon-cyan)]" />
                 Context: monthly index + recent entries
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  clearAiKey();
-                  setNeedsKey(true);
-                }}
-                className="text-xs font-sans text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
-              >
-                Change key
-              </motion.button>
             </div>
 
             <div className="flex gap-3">
@@ -309,6 +367,28 @@ export function AiPanel({
                 )}
               </motion.button>
             </div>
+
+            <AnimatePresence>
+              {webllmProgress && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                  className="rounded-2xl border border-[var(--neon-cyan)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)] flex items-center gap-3"
+                  style={{
+                    boxShadow: "0 0 20px rgba(0,245,255,0.3)",
+                  }}
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Cpu className="h-4 w-4 text-[var(--neon-cyan)]" />
+                  </motion.div>
+                  {webllmProgress}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {error ? (

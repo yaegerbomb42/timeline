@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
-import { DEFAULT_GEMINI_API_KEY, GEMINI_MODEL } from "@/lib/ai/config";
+import { GEMINI_MODEL } from "@/lib/ai/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
   // Filter out empty string, "null", and "undefined" string values
   const validHeaderKey = headerKey && headerKey !== "null" && headerKey !== "undefined" ? headerKey : null;
-  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_API_KEY;
+  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Missing AI key." }, { status: 400 });
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
@@ -170,5 +170,4 @@ export async function POST(req: Request) {
     );
   }
 }
-
 
