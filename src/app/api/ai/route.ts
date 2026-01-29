@@ -24,7 +24,9 @@ export async function POST(req: Request) {
   if (!q) return NextResponse.json({ error: "Missing query." }, { status: 400 });
 
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
-  const apiKey = headerKey || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_API_KEY;
+  // Filter out empty string, "null", and "undefined" string values
+  const validHeaderKey = headerKey && headerKey !== "null" && headerKey !== "undefined" ? headerKey : null;
+  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY || DEFAULT_GEMINI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Missing AI key." }, { status: 400 });
 
   const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
@@ -41,7 +43,7 @@ export async function POST(req: Request) {
       temperature: 0.35,
       topK: 24,
       topP: 0.85,
-      maxOutputTokens: 700,
+      maxOutputTokens: 8192,
     };
 
     const contents = [
@@ -96,8 +98,18 @@ export async function POST(req: Request) {
       // If we have a candidate but no text, check the finish reason
       if (firstCandidate?.finishReason) {
         const finishReason = firstCandidate.finishReason;
-        if (finishReason === "STOP" || finishReason === "MAX_TOKENS") {
-          // These are normal finish reasons, but we still got empty text - unusual
+        if (finishReason === "MAX_TOKENS") {
+          // Reasoning exhausted the token limit before generating text
+          return NextResponse.json(
+            {
+              error: "Token limit exceeded.",
+              details: "The model's reasoning process exhausted the token limit before generating a response. Please try a simpler question or reduce the context.",
+            },
+            { status: 502 }
+          );
+        }
+        if (finishReason === "STOP") {
+          // Normal finish but we still got empty text - unusual
           return NextResponse.json(
             {
               error: "Empty AI response.",

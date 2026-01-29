@@ -50,7 +50,7 @@ export function useAiKey(identity?: string | null) {
   return {
     aiKey,
     hydrated,
-    hasKey: Boolean(aiKey.trim()),
+    hasKey: Boolean(aiKey.trim()) || Boolean(DEFAULT_GEMINI_API_KEY),
     setAiKey,
     clearAiKey,
     useDefaultKey,
