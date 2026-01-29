@@ -97,14 +97,7 @@ function ParallaxHeader({ scrollY, user, signOut }: { scrollY: any; user: any; s
             transition={{ duration: 3, repeat: Infinity }}
           />
         </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="mt-4 max-w-xl text-base leading-7 text-[var(--text-secondary)]"
-        >
-          A vibrant chronicle of existence—each moment pulses with energy. Your story, written in living color.
-        </motion.p>
+
       </div>
 
       <motion.div
@@ -304,14 +297,17 @@ export function AppShell() {
             <StatsBar stats={statsSnapshot} />
           </motion.div>
         </motion.section>
+      </div>
 
+      {/* Full-width timeline bar breaking out of container */}
+      <div className="mx-auto w-full relative z-10 mb-12">
         {/* Timeline bar with 3D depth */}
         <motion.section
           ref={timelineCardRef}
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.8 }}
-          className="relative mb-12 rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden"
+          className="relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden mx-6"
           style={{
             boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
           }}
@@ -349,7 +345,9 @@ export function AppShell() {
             }}
           />
         </motion.section>
+      </div>
 
+      <div className="mx-auto w-full max-w-7xl relative z-10">
         {/* Feed + AI + sort with fluid grid */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -407,7 +405,7 @@ export function AppShell() {
               }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
             >
-              <AiPanel uid={user.uid} identity={user.email ?? user.uid} chats={chats} />
+              <AiPanel uid={user.uid} chats={chats} />
             </motion.div>
           </div>
         </motion.div>

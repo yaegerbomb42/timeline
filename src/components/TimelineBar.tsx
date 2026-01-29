@@ -196,7 +196,7 @@ export function TimelineBar({
         }}
       >
         <div
-          className="relative h-[140px]"
+          className="relative h-[300px]"
           style={{
             width: trackWidth,
             minWidth: "100%",
@@ -228,9 +228,9 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const stackMax = 80;
-              const gapPx = Math.max(3, Math.min(8, Math.floor(stackMax / Math.max(1, marks.length))));
-              const dotPx = Math.max(4, Math.min(10, gapPx + 2));
+              const stackMax = 200;
+              const gapPx = Math.max(6, Math.min(16, Math.floor(stackMax / Math.max(1, marks.length))));
+              const dotPx = Math.max(10, Math.min(20, gapPx + 4));
 
               return (
                 <motion.div

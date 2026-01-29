@@ -1,13 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Wand2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud } from "lucide-react";
+import { useMemo, useState, useRef, useEffect } from "react";
 
 import { buildTimelineContext } from "@/lib/ai/context";
 import type { MonthIndex } from "@/lib/ai/monthIndex";
 import { useMonthIndex } from "@/lib/ai/monthIndex";
 import { useAiKey } from "@/lib/ai/useAiKey";
+import { generateWithWebLLM, isWebGPUAvailable } from "@/lib/ai/webllm";
 import type { Chat } from "@/lib/chats";
 import { cn } from "@/lib/utils";
 
@@ -53,11 +54,9 @@ function HolographicText({ children, className }: { children: React.ReactNode; c
 
 export function AiPanel({
   uid,
-  identity,
   chats,
 }: {
   uid: string;
-  identity: string;
   chats: Chat[];
 }) {
   const { months } = useMonthIndex(uid);
@@ -66,49 +65,118 @@ export function AiPanel({
     [months, chats],
   );
 
-  const { aiKey, hydrated, hasKey, setAiKey, clearAiKey, useDefaultKey } = useAiKey(identity);
+  const { aiKey, hydrated, hasKey, loading, setAiKey, clearAiKey } = useAiKey(uid);
 
   const [query, setQuery] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
+  const [aiMode, setAiMode] = useState<"local" | "pro">("local");
+  const [webllmProgress, setWebllmProgress] = useState<string | null>(null);
+  
+  // Chat history
+  type ChatMessage = {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    timestamp: number;
+  };
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const ready = hydrated && hasKey && !needsKey;
+  // Auto-scroll to bottom when chat history updates
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory, busy]);
+
+  // Check if WebGPU is available for WebLLM
+  const webGPUAvailable = useMemo(() => isWebGPUAvailable(), []);
+
+  // Automatically switch to Pro mode if WebGPU is not available
+  useEffect(() => {
+    if (!webGPUAvailable && aiMode === "local") {
+      setAiMode("pro");
+    }
+  }, [webGPUAvailable, aiMode]);
+
+  // Determine effective mode and ready state
+  const effectiveMode = aiMode;
+  const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : hasKey) && !needsKey;
 
   async function ask() {
     const q = query.trim();
     if (!q) return;
+    
+    // Add user message to history
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: q,
+      timestamp: Date.now(),
+    };
+    setChatHistory(prev => [...prev, userMessage]);
+    setQuery(""); // Clear input immediately
+    
     setError(null);
-    setAnswer(null);
     setBusy(true);
+    setWebllmProgress(null);
+    
     try {
       const context = buildTimelineContext({ months: monthIndex, chats });
-      const res = await fetch("/api/ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-timeline-ai-key": aiKey,
-        },
-        body: JSON.stringify({ query: q, context }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        const msg = String(payload?.details || payload?.error || `AI request failed (${res.status}).`);
-        if (res.status === 401 || res.status === 403) {
-          clearAiKey();
-          setNeedsKey(true);
-          setError("Your AI key was rejected. Re-enter it and try again.");
+      
+      if (effectiveMode === "local") {
+        // Use WebLLM local model
+        const response = await generateWithWebLLM(q, context, (progress) => {
+          setWebllmProgress(progress.text);
+        });
+        
+        // Add assistant response to history
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: response,
+          timestamp: Date.now(),
+        };
+        setChatHistory(prev => [...prev, assistantMessage]);
+        setWebllmProgress(null);
+      } else {
+        // Use Gemini Pro API
+        const res = await fetch("/api/ai", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-timeline-ai-key": aiKey,
+          },
+          body: JSON.stringify({ query: q, context }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          const msg = String(payload?.details || payload?.error || `AI request failed (${res.status}).`);
+          if (res.status === 401 || res.status === 403) {
+            clearAiKey();
+            setNeedsKey(true);
+            setError("Your AI key was rejected. Re-enter it and try again.");
+            return;
+          }
+          setError(msg);
           return;
         }
-        setError(msg);
-        return;
+        const data = (await res.json()) as { text?: string };
+        const responseText = data.text?.trim() || "(No response)";
+        
+        // Add assistant response to history
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: responseText,
+          timestamp: Date.now(),
+        };
+        setChatHistory(prev => [...prev, assistantMessage]);
       }
-      const data = (await res.json()) as { text?: string };
-      setAnswer(data.text?.trim() || "(No response)");
-    } catch (err: any) {
-      setError(err?.message ?? "AI request failed.");
+    } catch (err) {
+      const error = err as Error;
+      setError(error?.message ?? "AI request failed.");
     } finally {
       setBusy(false);
     }
@@ -147,21 +215,21 @@ export function AiPanel({
             <LibraryBig className="h-5 w-5 text-[var(--neon-cyan)]" />
           </motion.div>
           <HolographicText className="font-sans text-base font-bold">
-            Ask about your timeline
+            Timeline Chat
           </HolographicText>
         </div>
         <div className="mt-2 text-sm text-[var(--text-secondary)] flex items-center gap-2">
           <Brain className="h-3.5 w-3.5 text-[var(--neon-purple)]" />
-          Summaries like &ldquo;Tell me about July.&rdquo; (AI is for synthesis, not simple find.)
+          Ask questions about your timeline and get AI-powered insights
         </div>
       </div>
 
       <div className="px-6 py-6">
-        {!hydrated ? (
+        {!hydrated || loading ? (
           <motion.div
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="text-sm text-[var(--neon-cyan)] flex items-center gap-3"
+            className="text-sm text-[var(--electric-blue)] flex items-center gap-3"
           >
             <motion.div
               animate={{ rotate: 360 }}
@@ -169,24 +237,29 @@ export function AiPanel({
             >
               <Zap className="h-4 w-4" />
             </motion.div>
-            Loading…
+            Loading settings…
           </motion.div>
         ) : null}
 
-        {hydrated && (!hasKey || needsKey) ? (
+        {hydrated && (!hasKey || needsKey) && effectiveMode === "pro" ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
             <div className="text-sm text-[var(--text-primary)] leading-6">
-              Enter your Gemini API key once for <span className="font-mono text-[var(--neon-cyan)]">{identity}</span>.
-              If it ever stops working, you&apos;ll see this again—nothing breaks.
+              {!webGPUAvailable && (
+                <div className="mb-3 px-3 py-2 rounded-xl bg-[var(--amber-glow)]/10 border border-[var(--amber-glow)]/30 text-xs">
+                  ⚠️ WebGPU is not available in your browser. Local AI mode is disabled. Please use Pro mode with your Gemini API key.
+                </div>
+              )}
+              Enter your Gemini API key for <span className="font-mono text-[var(--electric-blue)]">{uid}</span> to use Pro mode.
+              {webGPUAvailable && <> Or switch to Local mode to use WebLLM (no API key needed).</>}
             </div>
 
             <label className="block">
               <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
-                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> AI Key
+                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> Gemini API Key
               </span>
               <motion.input
                 value={keyDraft}
@@ -201,45 +274,25 @@ export function AiPanel({
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
-              <motion.button
-                disabled={busy}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setNeedsKey(false);
-                  setError(null);
-                  setAiKey(keyDraft);
-                  setKeyDraft("");
-                }}
-                className={cn(
-                  "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
-                  "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
-                  "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
-                  "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
-                )}
-              >
-                Save key
-              </motion.button>
-              <motion.button
-                disabled={busy}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setNeedsKey(false);
-                  setError(null);
-                  // eslint-disable-next-line react-hooks/rules-of-hooks
-                  useDefaultKey();
-                }}
-                className="rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-5 py-3 font-sans text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/80 transition-all flex items-center gap-2"
-                style={{
-                  boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-                }}
-              >
-                <Wand2 className="h-4 w-4 text-[var(--neon-purple)]" />
-                Use included key
-              </motion.button>
-            </div>
+            <motion.button
+              disabled={busy}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setNeedsKey(false);
+                setError(null);
+                setAiKey(keyDraft);
+                setKeyDraft("");
+              }}
+              className={cn(
+                "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
+                "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
+                "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
+                "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
+              )}
+            >
+              Save key
+            </motion.button>
           </motion.div>
         ) : null}
 
@@ -247,100 +300,194 @@ export function AiPanel({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            className="flex flex-col h-[500px]"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-                <Brain className="h-3.5 w-3.5 text-[var(--neon-cyan)]" />
-                Context: monthly index + recent entries
+            {/* Mode Selection and Settings */}
+            <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-[var(--line)]">
+              <div className="text-xs text-[var(--text-secondary)] font-sans">AI Mode:</div>
+              <div className="flex gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setAiMode("local")}
+                  disabled={!webGPUAvailable}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
+                    aiMode === "local" && webGPUAvailable
+                      ? "border-[var(--neon-cyan)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[0_0_20px_var(--glow-cyan)]"
+                      : "border-[var(--line)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-cyan)]",
+                    !webGPUAvailable && "opacity-50 cursor-not-allowed"
+                  )}
+                  title={!webGPUAvailable ? "WebGPU not available in your browser" : "Free local AI using WebLLM"}
+                >
+                  <Cpu className="h-3.5 w-3.5" />
+                  Local
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setAiMode("pro")}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
+                    aiMode === "pro"
+                      ? "border-[var(--neon-purple)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[0_0_20px_var(--glow-purple)]"
+                      : "border-[var(--line)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-purple)]",
+                  )}
+                  title="Pro AI using Gemini (requires API key)"
+                >
+                  <Cloud className="h-3.5 w-3.5" />
+                  Pro
+                </motion.button>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  clearAiKey();
-                  setNeedsKey(true);
-                }}
-                className="text-xs font-sans text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
-              >
-                Change key
-              </motion.button>
+              {aiMode === "pro" && hasKey && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    clearAiKey();
+                    setNeedsKey(true);
+                  }}
+                  className="text-xs font-sans text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors ml-auto"
+                >
+                  Change key
+                </motion.button>
+              )}
             </div>
 
-            <div className="flex gap-3">
-              <motion.input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void ask();
-                }}
-                placeholder='e.g. "Tell me about my July."'
-                whileFocus={{ scale: 1.02 }}
-                className="flex-1 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3 font-sans text-[15px] text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all"
-                style={{
-                  boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-                }}
-              />
-              <motion.button
-                onClick={() => void ask()}
-                disabled={busy || !query.trim()}
-                whileHover={!busy && query.trim() ? { scale: 1.08, y: -2 } : {}}
-                whileTap={!busy && query.trim() ? { scale: 0.95 } : {}}
-                className={cn(
-                  "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
-                  "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
-                  "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
-                  "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
-                )}
-              >
-                {busy ? (
-                  <span className="flex items-center gap-2">
+            {/* Chat Messages - Scrollable Area */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {chatHistory.length === 0 && (
+                <div className="text-center text-sm text-[var(--text-secondary)] py-8">
+                  <Brain className="h-8 w-8 mx-auto mb-3 text-[var(--neon-cyan)] opacity-50" />
+                  <p>Start a conversation about your timeline</p>
+                  <p className="text-xs mt-2">Try: &ldquo;Tell me about July&rdquo;</p>
+                </div>
+              )}
+              
+              <AnimatePresence>
+                {chatHistory.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className={cn(
+                      "rounded-2xl px-4 py-3 text-[15px] leading-7",
+                      msg.role === "user"
+                        ? "bg-gradient-to-r from-[var(--neon-cyan)]/20 to-[var(--neon-purple)]/20 border border-[var(--neon-cyan)]/30 ml-8"
+                        : "bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)] mr-8"
+                    )}
+                    style={{
+                      boxShadow: msg.role === "user"
+                        ? "0 0 20px rgba(0,245,255,0.2)"
+                        : "0 0 20px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    <div className="text-xs text-[var(--text-secondary)] mb-1 font-sans">
+                      {msg.role === "user" ? "You" : "AI"}
+                    </div>
+                    <div className="text-[var(--text-primary)]">{msg.content}</div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              
+              {/* Loading indicator while thinking */}
+              {busy && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="rounded-2xl bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)] px-4 py-3 mr-8"
+                  style={{
+                    boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <div className="text-xs text-[var(--text-secondary)] mb-1 font-sans">AI</div>
+                  <div className="flex items-center gap-2 text-[var(--text-primary)]">
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     >
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="h-4 w-4 text-[var(--neon-cyan)]" />
                     </motion.div>
-                    Thinking…
-                  </span>
-                ) : (
-                  "Ask"
+                    <span>Thinking...</span>
+                  </div>
+                </motion.div>
+              )}
+              
+              {/* WebLLM Progress */}
+              <AnimatePresence>
+                {webllmProgress && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    className="rounded-2xl border border-[var(--neon-cyan)]/50 bg-[var(--bg-surface)]/80 px-4 py-2 text-xs text-[var(--text-secondary)] flex items-center gap-2"
+                  >
+                    <Cpu className="h-3.5 w-3.5 text-[var(--neon-cyan)]" />
+                    {webllmProgress}
+                  </motion.div>
                 )}
-              </motion.button>
+              </AnimatePresence>
+              
+              {/* Error Display */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)]"
+                    style={{
+                      boxShadow: "0 0 20px rgba(255,0,110,0.3)",
+                    }}
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              {/* Scroll anchor */}
+              <div ref={chatEndRef} />
             </div>
 
-            <AnimatePresence>
-              {error ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                  className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)]"
-                  style={{
-                    boxShadow: "0 0 20px rgba(255,0,110,0.3)",
+            {/* Input Bar at Bottom */}
+            <div className="px-6 py-4 border-t border-[var(--line)]">
+              <div className="flex gap-3">
+                <motion.input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void ask();
+                    }
                   }}
-                >
-                  {error}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {answer ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-5 py-4 text-[15px] leading-7 text-[var(--text-primary)]"
+                  placeholder='Ask about your timeline...'
+                  whileFocus={{ scale: 1.01 }}
+                  className="flex-1 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3 font-sans text-[15px] text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all"
                   style={{
-                    boxShadow: "0 0 30px rgba(0,245,255,0.2)",
+                    boxShadow: "0 0 20px rgba(0,0,0,0.3)",
                   }}
+                />
+                <motion.button
+                  onClick={() => void ask()}
+                  disabled={busy || !query.trim()}
+                  whileHover={!busy && query.trim() ? { scale: 1.08, y: -2 } : {}}
+                  whileTap={!busy && query.trim() ? { scale: 0.95 } : {}}
+                  className={cn(
+                    "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
+                    "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
+                    "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
+                    "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                  )}
                 >
-                  {answer}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+                  Send
+                </motion.button>
+              </div>
+            </div>
           </motion.div>
         ) : null}
       </div>
