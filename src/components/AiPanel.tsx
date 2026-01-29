@@ -57,7 +57,6 @@ export function AiPanel({
   chats,
 }: {
   uid: string;
-  identity: string;
   chats: Chat[];
 }) {
   const { months } = useMonthIndex(uid);
@@ -94,8 +93,15 @@ export function AiPanel({
   // Check if WebGPU is available for WebLLM
   const webGPUAvailable = useMemo(() => isWebGPUAvailable(), []);
 
-  // Default to Pro mode if no WebGPU and user has a key
-  const effectiveMode = !webGPUAvailable && hasKey ? "pro" : aiMode;
+  // Automatically switch to Pro mode if WebGPU is not available
+  useEffect(() => {
+    if (!webGPUAvailable && aiMode === "local") {
+      setAiMode("pro");
+    }
+  }, [webGPUAvailable, aiMode]);
+
+  // Determine effective mode and ready state
+  const effectiveMode = aiMode;
   const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : hasKey) && !needsKey;
 
   async function ask() {
@@ -242,8 +248,13 @@ export function AiPanel({
             className="space-y-4"
           >
             <div className="text-sm text-[var(--text-primary)] leading-6">
+              {!webGPUAvailable && (
+                <div className="mb-3 px-3 py-2 rounded-xl bg-[var(--amber-glow)]/10 border border-[var(--amber-glow)]/30 text-xs">
+                  ⚠️ WebGPU is not available in your browser. Local AI mode is disabled. Please use Pro mode with your Gemini API key.
+                </div>
+              )}
               Enter your Gemini API key for <span className="font-mono text-[var(--electric-blue)]">{uid}</span> to use Pro mode.
-              Or switch to Local mode to use WebLLM (no API key needed).
+              {webGPUAvailable && <> Or switch to Local mode to use WebLLM (no API key needed).</>}
             </div>
 
             <label className="block">
