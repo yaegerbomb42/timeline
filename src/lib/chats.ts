@@ -54,12 +54,12 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   let imageUrl: string | undefined = undefined;
   if (imageFile) {
     const imagePath = `users/${uid}/images/${now.getTime()}_${imageFile.name}`;
-    const imageRef = ref(storage, imagePath);
-    await uploadBytes(imageRef, imageFile);
-    imageUrl = await getDownloadURL(imageRef);
+    const storageRef = ref(storage, imagePath);
+    await uploadBytes(storageRef, imageFile);
+    imageUrl = await getDownloadURL(storageRef);
   }
   
-  const ref = await addDoc(collection(db, "users", uid, "chats"), {
+  const docRef = await addDoc(collection(db, "users", uid, "chats"), {
     text,
     excerpt,
     dayKey,
@@ -88,7 +88,7 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
       if (nextSamples.length < k) {
         nextSamples.push(excerpt);
       } else if (nextSamples.length > 0) {
-        const idx = hashString(ref.id) % nextSamples.length;
+        const idx = hashString(docRef.id) % nextSamples.length;
         nextSamples[idx] = excerpt;
       }
 
@@ -114,7 +114,7 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
     // ignore
   }
 
-  return ref.id;
+  return docRef.id;
 }
 
 export async function deleteChat(uid: string, chatId: string) {

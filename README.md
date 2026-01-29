@@ -26,6 +26,9 @@ Open `http://localhost:3000`.
 - **Firestore**
   - Create a Firestore database
   - Apply rules from `firestore.rules` (per-user silo)
+- **Storage**
+  - Enable Firebase Storage
+  - Apply rules from `storage.rules` (per-user image storage)
 
 Firebase web config is currently in `src/lib/firebase/client.ts`.
 
