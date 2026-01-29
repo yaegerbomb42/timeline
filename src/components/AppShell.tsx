@@ -97,14 +97,7 @@ function ParallaxHeader({ scrollY, user, signOut }: { scrollY: any; user: any; s
             transition={{ duration: 3, repeat: Infinity }}
           />
         </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="mt-4 max-w-xl text-base leading-7 text-[var(--text-secondary)]"
-        >
-          A vibrant chronicle of existence—each moment pulses with energy. Your story, written in living color.
-        </motion.p>
+
       </div>
 
       <motion.div

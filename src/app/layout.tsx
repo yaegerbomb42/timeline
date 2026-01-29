@@ -25,7 +25,7 @@ const fontCode = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Timeline | Living Memory",
-  description: "A vibrant chronicle of existence—each moment pulses with energy.",
+  description: "Your personal timeline.",
 };
 
 export default function RootLayout({
