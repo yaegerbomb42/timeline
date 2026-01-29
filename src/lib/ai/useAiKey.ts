@@ -1,49 +1,79 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 
-const STORAGE_PREFIX = "timeline.aiKey.v1:";
-
-function storageKey(identity: string) {
-  return `${STORAGE_PREFIX}${identity}`;
-}
-
-export function useAiKey(identity?: string | null) {
-  const key = useMemo(() => (identity ? storageKey(identity) : null), [identity]);
+export function useAiKey(uid?: string | null) {
   const [aiKey, setAiKeyState] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(false);
 
+  // Load API key from Firebase on mount
   useEffect(() => {
-    if (!key) return;
-    try {
-      const v = localStorage.getItem(key);
-      setAiKeyState(v ?? "");
-    } catch {
-      setAiKeyState("");
-    } finally {
+    if (!uid) {
       setHydrated(true);
+      return;
     }
-  }, [key]);
 
-  function setAiKey(next: string) {
+    let cancelled = false;
+    
+    async function loadKey() {
+      setLoading(true);
+      try {
+        const docRef = doc(db, "users", uid, "settings", "aiConfig");
+        const docSnap = await getDoc(docRef);
+        
+        if (!cancelled && docSnap.exists()) {
+          const data = docSnap.data();
+          setAiKeyState(data?.geminiApiKey ?? "");
+        }
+      } catch (error) {
+        console.error("Error loading AI key from Firebase:", error);
+        // Silently fail - user can re-enter key
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadKey();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  async function setAiKey(next: string) {
     const v = next.trim();
     setAiKeyState(v);
-    if (!key) return;
+    
+    if (!uid) return;
+    
     try {
-      if (!v) localStorage.removeItem(key);
-      else localStorage.setItem(key, v);
-    } catch {
-      // ignore
+      const docRef = doc(db, "users", uid, "settings", "aiConfig");
+      if (!v) {
+        // Clear the key by setting it to empty string
+        await setDoc(docRef, { geminiApiKey: "" }, { merge: true });
+      } else {
+        await setDoc(docRef, { geminiApiKey: v }, { merge: true });
+      }
+    } catch (error) {
+      console.error("Error saving AI key to Firebase:", error);
+      // Key is still updated locally, so user can continue using it this session
     }
   }
 
   function clearAiKey() {
-    setAiKey("");
+    void setAiKey("");
   }
 
   return {
     aiKey,
     hydrated,
+    loading,
     hasKey: Boolean(aiKey.trim()),
     setAiKey,
     clearAiKey,

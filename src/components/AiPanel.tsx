@@ -67,7 +67,7 @@ export function AiPanel({
     [months, chats],
   );
 
-  const { aiKey, hydrated, hasKey, setAiKey, clearAiKey } = useAiKey(identity);
+  const { aiKey, hydrated, hasKey, loading, setAiKey, clearAiKey } = useAiKey(uid);
 
   const [query, setQuery] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
@@ -233,11 +233,11 @@ export function AiPanel({
       </div>
 
       <div className="px-6 py-6">
-        {!hydrated ? (
+        {!hydrated || loading ? (
           <motion.div
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="text-sm text-[var(--neon-cyan)] flex items-center gap-3"
+            className="text-sm text-[var(--electric-blue)] flex items-center gap-3"
           >
             <motion.div
               animate={{ rotate: 360 }}
@@ -245,7 +245,7 @@ export function AiPanel({
             >
               <Zap className="h-4 w-4" />
             </motion.div>
-            Loading…
+            Loading settings…
           </motion.div>
         ) : null}
 
@@ -256,7 +256,7 @@ export function AiPanel({
             className="space-y-4"
           >
             <div className="text-sm text-[var(--text-primary)] leading-6">
-              Enter your Gemini API key for <span className="font-mono text-[var(--neon-cyan)]">{identity}</span> to use Pro mode.
+              Enter your Gemini API key for <span className="font-mono text-[var(--electric-blue)]">{uid}</span> to use Pro mode.
               Or switch to Local mode to use WebLLM (no API key needed).
             </div>
 
