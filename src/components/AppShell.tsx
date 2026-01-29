@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
-import { ArrowDown01, ArrowUp10, LogOut, UserCircle2, Sparkles, Zap } from "lucide-react";
+import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -17,13 +17,23 @@ import { cn } from "@/lib/utils";
 
 // Animated background particles
 function FloatingParticles() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    delay: Math.random() * 5,
-    duration: 10 + Math.random() * 10,
-  }));
+  // eslint-disable-next-line react-hooks/purity
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        delay: Math.random() * 5,
+        duration: 10 + Math.random() * 10,
+        width: Math.random() * 4 + 2,
+        height: Math.random() * 4 + 2,
+        opacity: 0.3 + Math.random() * 0.4,
+        blur: Math.random() * 10 + 5,
+        xMovement: Math.random() * 20 - 10,
+      })),
+    [],
+  );
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
@@ -34,14 +44,14 @@ function FloatingParticles() {
           style={{
             left: `${p.x}%`,
             top: `${p.y}%`,
-            width: Math.random() * 4 + 2,
-            height: Math.random() * 4 + 2,
-            background: `radial-gradient(circle, rgba(0, 245, 255, ${0.3 + Math.random() * 0.4}), transparent)`,
-            boxShadow: `0 0 ${Math.random() * 10 + 5}px rgba(0, 245, 255, 0.5)`,
+            width: p.width,
+            height: p.height,
+            background: `radial-gradient(circle, rgba(0, 245, 255, ${p.opacity}), transparent)`,
+            boxShadow: `0 0 ${p.blur}px rgba(0, 245, 255, 0.5)`,
           }}
           animate={{
             y: [0, -30, 0],
-            x: [0, Math.random() * 20 - 10, 0],
+            x: [0, p.xMovement, 0],
             opacity: [0.3, 1, 0.3],
             scale: [1, 1.5, 1],
           }}
@@ -273,11 +283,11 @@ export function AppShell() {
                 const midY = Math.min(startY, endY) - 130;
                 setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
               }}
-              onSend={async (text) => {
+              onSend={async (text, imageFile) => {
                 if (!user?.uid) return;
                 setSending(true);
                 try {
-                  const id = await addChat(user.uid, text);
+                  const id = await addChat(user.uid, text, imageFile);
                   setHighlightChatId(id);
                 } finally {
                   setSending(false);

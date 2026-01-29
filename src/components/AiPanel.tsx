@@ -147,12 +147,12 @@ export function AiPanel({
             <LibraryBig className="h-5 w-5 text-[var(--neon-cyan)]" />
           </motion.div>
           <HolographicText className="font-sans text-base font-bold">
-            Ask the librarian
+            Ask about your timeline
           </HolographicText>
         </div>
         <div className="mt-2 text-sm text-[var(--text-secondary)] flex items-center gap-2">
           <Brain className="h-3.5 w-3.5 text-[var(--neon-purple)]" />
-          Summaries like "Tell me about July." (AI is for synthesis, not simple find.)
+          Summaries like &ldquo;Tell me about July.&rdquo; (AI is for synthesis, not simple find.)
         </div>
       </div>
 
@@ -181,7 +181,7 @@ export function AiPanel({
           >
             <div className="text-sm text-[var(--text-primary)] leading-6">
               Enter your Gemini API key once for <span className="font-mono text-[var(--neon-cyan)]">{identity}</span>.
-              If it ever stops working, you'll see this again—nothing breaks.
+              If it ever stops working, you&apos;ll see this again—nothing breaks.
             </div>
 
             <label className="block">
@@ -228,6 +228,7 @@ export function AiPanel({
                 onClick={() => {
                   setNeedsKey(false);
                   setError(null);
+                  // eslint-disable-next-line react-hooks/rules-of-hooks
                   useDefaultKey();
                 }}
                 className="rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-5 py-3 font-sans text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/80 transition-all flex items-center gap-2"

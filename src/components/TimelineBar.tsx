@@ -8,6 +8,7 @@ import { useEffect, useMemo } from "react";
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
+import { getMoodColor } from "@/lib/sentiment";
 
 type DayBucket = {
   dayKey: string; // yyyy-MM-dd
@@ -33,11 +34,18 @@ function GlowingDot({
   onClick?: () => void;
   size: number;
 }) {
+  const moodColor = chat.mood ? getMoodColor(chat.mood) : '#00f5ff';
+  const moodColorRgba = chat.mood 
+    ? (chat.mood === 'positive' ? 'rgba(0,255,136,0.6)' : 
+       chat.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
+       'rgba(0,245,255,0.6)')
+    : 'rgba(0,245,255,0.6)';
+    
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}`}
+      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}${chat.mood ? `\n\nMood: ${chat.mood}` : ''}`}
       initial={{ opacity: 0, scale: 0.3, y: 10 }}
       animate={{
         opacity: 1,
@@ -45,14 +53,14 @@ function GlowingDot({
         y: 0,
         boxShadow: isHighlighted
           ? [
-              "0 0 0 0px rgba(0,245,255,0)",
-              "0 0 0 15px rgba(0,245,255,0.4)",
-              "0 0 0 8px rgba(131,56,236,0.3)",
-              "0 0 0 0px rgba(0,245,255,0)",
+              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
+              `0 0 0 15px ${moodColorRgba}`,
+              `0 0 0 8px ${moodColorRgba.replace('0.6', '0.4')}`,
+              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
             ]
           : isNewest
-            ? "0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(131,56,236,0.4)"
-            : "0 0 10px rgba(0,245,255,0.3)",
+            ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
+            : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
       }}
       exit={{ opacity: 0, scale: 0.3, y: 10 }}
       transition={{
@@ -62,14 +70,15 @@ function GlowingDot({
       whileHover={{ scale: 1.3, y: -2 }}
       whileTap={{ scale: 0.9 }}
       className={cn(
-        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-[var(--glow-cyan)]",
-        isNewest
-          ? "bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-purple)]"
-          : "bg-gradient-to-br from-[var(--neon-purple)]/80 to-[var(--neon-pink)]/80",
+        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4",
       )}
       style={{
         width: size,
         height: size,
+        background: `radial-gradient(circle, ${moodColor}, ${moodColor}dd)`,
+        boxShadow: isNewest 
+          ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
+          : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
       }}
     >
       {isNewest && (
@@ -81,7 +90,7 @@ function GlowingDot({
           }}
           transition={{ duration: 2, repeat: Infinity }}
           style={{
-            background: "radial-gradient(circle, var(--neon-cyan), transparent)",
+            background: `radial-gradient(circle, ${moodColor}, transparent)`,
           }}
         />
       )}

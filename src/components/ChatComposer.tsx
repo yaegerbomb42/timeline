@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Feather, Sparkles, Mic, Zap } from "lucide-react";
+import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { WordVacuum } from "@/components/WordVacuum";
@@ -77,7 +77,7 @@ export function ChatComposer({
   onSendStart,
 }: {
   disabled?: boolean;
-  onSend: (text: string) => Promise<void> | void;
+  onSend: (text: string, imageFile?: File) => Promise<void> | void;
   onSendStart?: (start: DOMRect) => void;
 }) {
   const [value, setValue] = useState("");
@@ -85,8 +85,11 @@ export function ChatComposer({
   const [ink, setInk] = useState<null | number>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wordCount = value.trim().split(/\s+/).filter((w) => w.trim()).length;
 
   useEffect(() => {
@@ -95,6 +98,18 @@ export function ChatComposer({
     el.style.height = "0px";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
+
+  useEffect(() => {
+    if (imageFile) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(imageFile);
+    } else {
+      setImagePreview(null);
+    }
+  }, [imageFile]);
 
   async function send() {
     const text = value.trim();
@@ -108,10 +123,27 @@ export function ChatComposer({
       onSendStart?.(rect);
     }
     try {
-      await onSend(text);
+      await onSend(text, imageFile || undefined);
       setValue("");
+      setImageFile(null);
+      setImagePreview(null);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setImageFile(file);
+    }
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   }
 
@@ -212,8 +244,70 @@ export function ChatComposer({
           ) : null}
         </div>
 
+        {/* Image preview */}
+        <AnimatePresence>
+          {imagePreview && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="mt-4 relative rounded-2xl overflow-hidden border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl"
+              style={{
+                boxShadow: "0 0 20px rgba(0,245,255,0.2)",
+              }}
+            >
+              <img 
+                src={imagePreview} 
+                alt="Preview" 
+                className="w-full h-auto max-h-64 object-contain"
+              />
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={removeImage}
+                className="absolute top-2 right-2 rounded-full bg-[var(--bg-deep)]/80 backdrop-blur-xl p-2 border border-[var(--line)]"
+                style={{
+                  boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+                }}
+              >
+                <X className="h-4 w-4 text-[var(--neon-pink)]" />
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="mt-6 flex items-center justify-between">
-          <WordCounter count={wordCount} />
+          <div className="flex items-center gap-4">
+            <WordCounter count={wordCount} />
+            
+            {/* Image upload button */}
+            <motion.label
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-2xl px-4 py-2 cursor-pointer",
+                "border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+                "text-[var(--text-secondary)] hover:text-[var(--neon-cyan)] transition-all",
+                imageFile && "text-[var(--neon-cyan)] border-[var(--neon-cyan)]",
+              )}
+              style={{
+                boxShadow: imageFile 
+                  ? "0 0 20px rgba(0,245,255,0.3)" 
+                  : "0 0 10px rgba(0,0,0,0.2)",
+              }}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="text-sm font-sans">{imageFile ? 'Image added' : 'Add image'}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                disabled={disabled || busy}
+                className="hidden"
+              />
+            </motion.label>
+          </div>
 
           <div className="relative">
             <motion.button

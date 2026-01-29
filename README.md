@@ -7,7 +7,7 @@ A time‑bound story, written one entry at a time — warm, quiet UI (no neon), 
 - **Auth**: Firebase Auth (Google + email/password)
 - **Persistence**: Firestore per-user storage
 - **Timeline bar**: Horizontal day ticks with stacked marks, auto-fit + optional scroll, auto-scroll to newest, and a “badge earned” animation when you add an entry
-- **AI (“Ask the librarian”)**: One-call semantic summary/search over your timeline using a bounded context (monthly index + recent entries)
+- **AI (“Ask about your timeline”)**: One-call semantic summary/search over your timeline using a bounded context (monthly index + recent entries)
 
 ## Local dev
 
@@ -26,6 +26,9 @@ Open `http://localhost:3000`.
 - **Firestore**
   - Create a Firestore database
   - Apply rules from `firestore.rules` (per-user silo)
+- **Storage**
+  - Enable Firebase Storage
+  - Apply rules from `storage.rules` (per-user image storage)
 
 Firebase web config is currently in `src/lib/firebase/client.ts`.
 
