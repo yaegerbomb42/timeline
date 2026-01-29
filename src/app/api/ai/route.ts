@@ -103,7 +103,7 @@ export async function POST(req: Request) {
           return NextResponse.json(
             {
               error: "Token limit exceeded.",
-              details: "The model's reasoning process exhausted the token limit before generating a response. Please try a simpler question or reduce the context.",
+              details: "The model's reasoning process exhausted the token limit before generating a response. Please try a simpler or shorter question.",
             },
             { status: 502 }
           );
