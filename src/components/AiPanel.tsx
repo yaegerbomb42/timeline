@@ -147,7 +147,7 @@ export function AiPanel({
             <LibraryBig className="h-5 w-5 text-[var(--neon-cyan)]" />
           </motion.div>
           <HolographicText className="font-sans text-base font-bold">
-            Ask the librarian
+            Ask about your timeline
           </HolographicText>
         </div>
         <div className="mt-2 text-sm text-[var(--text-secondary)] flex items-center gap-2">

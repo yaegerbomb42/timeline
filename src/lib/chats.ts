@@ -12,9 +12,11 @@ import {
   serverTimestamp,
   deleteDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
 
-import { db } from "@/lib/firebase/client";
+import { db, storage } from "@/lib/firebase/client";
+import { analyzeMood, type Mood } from "@/lib/sentiment";
 
 export type Chat = {
   id: string;
@@ -23,6 +25,8 @@ export type Chat = {
   createdAt: Date;
   createdAtMs: number;
   dayKey: string; // yyyy-MM-dd (local)
+  mood?: Mood;
+  imageUrl?: string;
 };
 
 function makeExcerpt(text: string, max = 220) {
@@ -39,15 +43,28 @@ function hashString(s: string) {
   return h;
 }
 
-export async function addChat(uid: string, text: string) {
+export async function addChat(uid: string, text: string, imageFile?: File) {
   const now = new Date();
   const dayKey = format(now, "yyyy-MM-dd");
   const monthKey = dayKey.slice(0, 7);
   const excerpt = makeExcerpt(text);
+  const mood = analyzeMood(text);
+  
+  // Upload image to Firebase Storage if provided
+  let imageUrl: string | undefined = undefined;
+  if (imageFile) {
+    const imagePath = `users/${uid}/images/${now.getTime()}_${imageFile.name}`;
+    const imageRef = ref(storage, imagePath);
+    await uploadBytes(imageRef, imageFile);
+    imageUrl = await getDownloadURL(imageRef);
+  }
+  
   const ref = await addDoc(collection(db, "users", uid, "chats"), {
     text,
     excerpt,
     dayKey,
+    mood,
+    imageUrl,
     createdAtLocal: now.toISOString(),
     createdAt: serverTimestamp(),
     v: 1,
@@ -132,6 +149,8 @@ export function useChats(uid?: string) {
             createdAt,
             createdAtMs: createdAt.getTime(),
             dayKey,
+            mood: data.mood,
+            imageUrl: data.imageUrl,
           };
         });
         setChats(items);

@@ -259,6 +259,25 @@ function EntryCard({
           )}
         </motion.div>
 
+        {/* Image display */}
+        {chat.imageUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: index * 0.05 + 0.3, duration: 0.5 }}
+            className="mt-4 rounded-2xl overflow-hidden border border-[var(--line)] bg-[var(--bg-surface)]/40"
+            style={{
+              boxShadow: "0 0 30px rgba(0,245,255,0.2)",
+            }}
+          >
+            <img
+              src={chat.imageUrl}
+              alt="Entry image"
+              className="w-full h-auto object-contain"
+            />
+          </motion.div>
+        )}
+
         {/* Shimmer effect on highlight */}
         {isHighlighted ? (
           <motion.div

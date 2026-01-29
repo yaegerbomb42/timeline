@@ -273,11 +273,11 @@ export function AppShell() {
                 const midY = Math.min(startY, endY) - 130;
                 setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
               }}
-              onSend={async (text) => {
+              onSend={async (text, imageFile) => {
                 if (!user?.uid) return;
                 setSending(true);
                 try {
-                  const id = await addChat(user.uid, text);
+                  const id = await addChat(user.uid, text, imageFile);
                   setHighlightChatId(id);
                 } finally {
                   setSending(false);
