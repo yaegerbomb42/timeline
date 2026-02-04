@@ -230,19 +230,36 @@ function EntryCard({
             </motion.div>
             <span className="font-semibold">{format(chat.createdAt, "PPP p")}</span>
           </motion.div>
-          {onDelete ? (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.04 + 0.1, duration: 0.4 }}
-              whileHover={{ scale: 1.15, rotate: 15 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleDeleteClick}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl p-2 text-[var(--text-secondary)] hover:text-[var(--neon-pink)] hover:bg-[var(--bg-surface)]/50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </motion.button>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {/* Mood indicator */}
+            {chat.moodAnalysis && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04 + 0.05, duration: 0.4 }}
+                className="inline-flex items-center gap-2 rounded-xl px-3 py-1 border border-[var(--line)] bg-[var(--bg-surface)]/50"
+                title={`Mood: ${chat.moodAnalysis.mood}`}
+              >
+                <span className="text-lg">{chat.moodAnalysis.emoji}</span>
+                <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">
+                  {chat.moodAnalysis.rating}/10
+                </span>
+              </motion.div>
+            )}
+            {onDelete ? (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04 + 0.1, duration: 0.4 }}
+                whileHover={{ scale: 1.15, rotate: 15 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleDeleteClick}
+                className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl p-2 text-[var(--text-secondary)] hover:text-[var(--neon-pink)] hover:bg-[var(--bg-surface)]/50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </motion.button>
+            ) : null}
+          </div>
         </div>
 
         {/* Content with word reveal */}

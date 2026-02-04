@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X } from "lucide-react";
+import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { WordVacuum } from "@/components/WordVacuum";
@@ -87,16 +87,22 @@ export function ChatComposer({
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
   const wordCount = value.trim().split(/\s+/).filter((w) => w.trim()).length;
 
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    // Use requestAnimationFrame to prevent jittering during paste
+    requestAnimationFrame(() => {
+      el.style.height = "0px";
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    });
   }, [value]);
 
   useEffect(() => {
@@ -111,10 +117,17 @@ export function ChatComposer({
     }
   }, [imageFile]);
 
-  async function send() {
+  async function send(retry = false) {
     const text = value.trim();
     if (!text) return;
-    setBusy(true);
+    
+    if (retry) {
+      setRetrying(true);
+    } else {
+      setBusy(true);
+      setError(null);
+    }
+    
     setInk(Date.now());
     if (sendButtonRef.current) {
       const rect = sendButtonRef.current.getBoundingClientRect();
@@ -127,8 +140,13 @@ export function ChatComposer({
       setValue("");
       setImageFile(null);
       setImagePreview(null);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to send chat:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send. Please try again.');
     } finally {
       setBusy(false);
+      setRetrying(false);
     }
   }
 
@@ -147,8 +165,32 @@ export function ChatComposer({
     }
   }
 
+  async function handlePaste() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        // Insert at cursor position
+        const textarea = textareaRef.current;
+        if (textarea) {
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const newValue = value.substring(0, start) + text + value.substring(end);
+          setValue(newValue);
+          // Restore cursor position after paste
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + text.length;
+            textarea.focus();
+          }, 0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to paste:', err);
+    }
+  }
+
   return (
     <motion.div
+      ref={composerRef}
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -204,8 +246,33 @@ export function ChatComposer({
         </motion.div>
       </div>
 
+      {/* Error message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-6 pt-4"
+          >
+            <div className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm flex items-center justify-between gap-3">
+              <span className="text-[var(--neon-pink)]">{error}</span>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => send(true)}
+                disabled={retrying}
+                className="text-xs font-sans rounded-xl px-3 py-1 border border-[var(--neon-cyan)] text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)]"
+              >
+                {retrying ? 'Retrying...' : 'Retry'}
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="relative px-6 py-6">
-        <div className="relative" style={{ perspective: "1000px" }}>
+        <div className="relative flex items-start gap-2" style={{ perspective: "1000px" }}>
           <motion.textarea
             ref={textareaRef}
             value={value}
@@ -221,7 +288,7 @@ export function ChatComposer({
             disabled={disabled || busy}
             placeholder="Today, I…"
             className={cn(
-              "relative z-10 w-full resize-none rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+              "relative z-10 flex-1 resize-none rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
               "px-5 py-4 font-sans text-[16px] leading-7 text-[var(--text-primary)]",
               "outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all duration-300",
               "disabled:opacity-60 disabled:cursor-not-allowed",
@@ -231,9 +298,31 @@ export function ChatComposer({
               boxShadow: isFocused
                 ? "0 0 30px rgba(0,245,255,0.2), inset 0 0 20px rgba(0,245,255,0.05)"
                 : "0 0 10px rgba(0,0,0,0.2)",
+              minHeight: "80px",
             }}
             rows={3}
           />
+          
+          {/* Paste button */}
+          <motion.button
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handlePaste}
+            disabled={disabled || busy}
+            className={cn(
+              "rounded-2xl p-3 border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+              "text-[var(--text-secondary)] hover:text-[var(--neon-cyan)] transition-all",
+              "disabled:opacity-60 disabled:cursor-not-allowed",
+              "flex-shrink-0",
+            )}
+            style={{
+              boxShadow: "0 0 10px rgba(0,0,0,0.2)",
+            }}
+            title="Paste from clipboard"
+          >
+            <Clipboard className="h-5 w-5" />
+          </motion.button>
+          
           {/* Word vacuum system */}
           {isFocused && value.trim() ? (
             <WordVacuum

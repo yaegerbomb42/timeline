@@ -27,17 +27,19 @@ function GlowingDot({
   isHighlighted,
   onClick,
   size,
+  yOffset,
 }: {
   chat: Chat;
   isNewest?: boolean;
   isHighlighted?: boolean;
   onClick?: () => void;
   size: number;
+  yOffset: number;
 }) {
-  const moodColor = chat.mood ? getMoodColor(chat.mood) : '#00f5ff';
-  const moodColorRgba = chat.mood 
-    ? (chat.mood === 'positive' ? 'rgba(0,255,136,0.6)' : 
-       chat.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
+  const moodColor = chat.moodAnalysis ? getMoodColor(chat.moodAnalysis.mood) : '#00f5ff';
+  const moodColorRgba = chat.moodAnalysis 
+    ? (chat.moodAnalysis.mood === 'positive' ? 'rgba(0,255,136,0.6)' : 
+       chat.moodAnalysis.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
        'rgba(0,245,255,0.6)')
     : 'rgba(0,245,255,0.6)';
     
@@ -45,12 +47,12 @@ function GlowingDot({
     <motion.button
       type="button"
       onClick={onClick}
-      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}${chat.mood ? `\n\nMood: ${chat.mood}` : ''}`}
+      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/10` : ''}`}
       initial={{ opacity: 0, scale: 0.3, y: 10 }}
       animate={{
         opacity: 1,
         scale: isHighlighted ? [1, 1.3, 1] : 1,
-        y: 0,
+        y: yOffset,
         boxShadow: isHighlighted
           ? [
               `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
@@ -67,10 +69,10 @@ function GlowingDot({
         duration: isHighlighted ? 1.5 : 0.4,
         ease: [0.22, 1, 0.36, 1],
       }}
-      whileHover={{ scale: 1.3, y: -2 }}
+      whileHover={{ scale: 1.3, y: yOffset - 2 }}
       whileTap={{ scale: 0.9 }}
       className={cn(
-        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4",
+        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10",
       )}
       style={{
         width: size,
@@ -93,6 +95,15 @@ function GlowingDot({
             background: `radial-gradient(circle, ${moodColor}, transparent)`,
           }}
         />
+      )}
+      {/* Show mood emoji on hover */}
+      {chat.moodAnalysis && (
+        <motion.div
+          className="absolute -top-6 left-1/2 -translate-x-1/2 text-lg opacity-0 group-hover:opacity-100 pointer-events-none"
+          whileHover={{ opacity: 1 }}
+        >
+          {chat.moodAnalysis.emoji}
+        </motion.div>
       )}
     </motion.button>
   );
@@ -202,6 +213,62 @@ export function TimelineBar({
             minWidth: "100%",
           }}
         >
+          {/* Roller coaster path connecting the dots */}
+          <svg 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ width: '100%', height: '100%' }}
+          >
+            <defs>
+              <linearGradient id="rollercoaster-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="var(--neon-cyan)" stopOpacity="0.6" />
+                <stop offset="50%" stopColor="var(--neon-purple)" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="var(--neon-pink)" stopOpacity="0.6" />
+              </linearGradient>
+            </defs>
+            {days.length > 1 && (
+              <motion.path
+                d={(() => {
+                  const points = days.flatMap((day, idx) => {
+                    const x = idx * slotWidth + slotWidth / 2;
+                    return day.chats.map((chat) => {
+                      // Calculate Y position based on mood rating (1-10)
+                      // Rating 1 (sad) -> bottom (y=250), Rating 10 (happy) -> top (y=50)
+                      const rating = chat.moodAnalysis?.rating ?? 5.5;
+                      const y = 250 - ((rating - 1) / 9) * 200;
+                      return { x, y };
+                    });
+                  });
+                  
+                  if (points.length < 2) return '';
+                  
+                  // Create smooth curve through points
+                  let path = `M ${points[0]!.x} ${points[0]!.y}`;
+                  
+                  for (let i = 1; i < points.length; i++) {
+                    const prev = points[i - 1]!;
+                    const curr = points[i]!;
+                    const cpx = (prev.x + curr.x) / 2;
+                    path += ` Q ${cpx} ${prev.y}, ${cpx} ${(prev.y + curr.y) / 2}`;
+                    path += ` Q ${cpx} ${curr.y}, ${curr.x} ${curr.y}`;
+                  }
+                  
+                  return path;
+                })()}
+                stroke="url(#rollercoaster-gradient)"
+                strokeWidth="3"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 0.8 }}
+                transition={{ duration: 2, ease: "easeInOut" }}
+                style={{
+                  filter: 'drop-shadow(0 0 10px var(--glow-cyan))',
+                }}
+              />
+            )}
+          </svg>
+
           {/* Animated baseline with gradient */}
           <motion.div
             className="absolute left-0 right-0 bottom-8 h-[2px]"
@@ -228,9 +295,7 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const stackMax = 200;
-              const gapPx = Math.max(6, Math.min(16, Math.floor(stackMax / Math.max(1, marks.length))));
-              const dotPx = Math.max(10, Math.min(20, gapPx + 4));
+              const dotPx = Math.max(12, Math.min(20, 16));
 
               return (
                 <motion.div
@@ -238,7 +303,7 @@ export function TimelineBar({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05, duration: 0.5 }}
-                  className="relative h-full"
+                  className="relative h-full group"
                   style={{ width: slotWidth, flex: `0 0 ${slotWidth}px` }}
                 >
                   {/* Month label with glow */}
@@ -268,22 +333,32 @@ export function TimelineBar({
                     transition={{ duration: 2, repeat: Infinity }}
                   />
 
-                  {/* Marks stack with 3D effect */}
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 bottom-10 flex flex-col items-center pb-2"
-                    style={{ gap: `${gapPx}px` }}
-                  >
+                  {/* Marks positioned by mood rating for roller coaster effect */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full h-full">
                     <AnimatePresence initial={false}>
-                      {marks.map((c, markIdx) => (
-                        <GlowingDot
-                          key={c.id}
-                          chat={c}
-                          isNewest={c.id === newestChatId}
-                          isHighlighted={c.id === highlightChatId}
-                          onClick={() => onSelectChat?.(c.id)}
-                          size={dotPx}
-                        />
-                      ))}
+                      {marks.map((c) => {
+                        // Calculate Y offset based on mood rating (1-10)
+                        // Rating 1 (sad) -> bottom, Rating 10 (happy) -> top
+                        const rating = c.moodAnalysis?.rating ?? 5.5;
+                        const yOffset = -50 - ((rating - 1) / 9) * 200;
+                        
+                        return (
+                          <div
+                            key={c.id}
+                            className="absolute left-1/2 -translate-x-1/2"
+                            style={{ bottom: '32px' }}
+                          >
+                            <GlowingDot
+                              chat={c}
+                              isNewest={c.id === newestChatId}
+                              isHighlighted={c.id === highlightChatId}
+                              onClick={() => onSelectChat?.(c.id)}
+                              size={dotPx}
+                              yOffset={yOffset}
+                            />
+                          </div>
+                        );
+                      })}
                     </AnimatePresence>
                   </div>
 
