@@ -9,20 +9,19 @@ import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";
 
 const WORD_DELAY = 28;
-const CHAR_DELAY = 20;
 
 // Enhanced particle burst with neon colors
 function ParticleBurst({ x, y, count = 20 }: { x: number; y: number; count?: number }) {
-  const particles = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => ({
+  const [particles] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
       id: i,
       angle: (i / count) * Math.PI * 2,
       distance: 35 + Math.random() * 25,
       duration: 0.8 + Math.random() * 0.4,
       delay: Math.random() * 0.2,
       color: i % 3 === 0 ? "var(--neon-cyan)" : i % 3 === 1 ? "var(--neon-purple)" : "var(--neon-pink)",
-    }));
-  }, [count]);
+    }))
+  );
 
   return (
     <div
@@ -56,7 +55,7 @@ function ParticleBurst({ x, y, count = 20 }: { x: number; y: number; count?: num
 }
 
 // Word-by-word reveal with neon glow
-function WordReveal({ text, delay = 0, onComplete }: { text: string; delay?: number; onComplete?: () => void }) {
+function WordReveal({ text, onComplete }: { text: string; onComplete?: () => void }) {
   const words = useMemo(() => text.split(/(\s+)/).filter((w) => w.trim() || w === " "), [text]);
   const [revealed, setRevealed] = useState(0);
   const completedRef = useRef(false);

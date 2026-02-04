@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock3, Trash2, Sparkles } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";

@@ -1,13 +1,13 @@
 "use client";
 
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import type { User } from "firebase/auth";
+import { AnimatePresence, motion, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
 import { AiPanel } from "@/components/AiPanel";
 import { ChatComposer } from "@/components/ChatComposer";
-import { ChatFeed } from "@/components/ChatFeed";
 import { TimelineLog } from "@/components/TimelineLog";
 import { StatsBar } from "@/components/StatsBar";
 import { TimelineBar } from "@/components/TimelineBar";
@@ -18,22 +18,19 @@ import { cn } from "@/lib/utils";
 
 // Animated background particles
 function FloatingParticles() {
-  // eslint-disable-next-line react-hooks/purity
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 20 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        delay: Math.random() * 5,
-        duration: 10 + Math.random() * 10,
-        width: Math.random() * 4 + 2,
-        height: Math.random() * 4 + 2,
-        opacity: 0.3 + Math.random() * 0.4,
-        blur: Math.random() * 10 + 5,
-        xMovement: Math.random() * 20 - 10,
-      })),
-    [],
+  const [particles] = useState(() =>
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      delay: Math.random() * 5,
+      duration: 10 + Math.random() * 10,
+      width: Math.random() * 4 + 2,
+      height: Math.random() * 4 + 2,
+      opacity: 0.3 + Math.random() * 0.4,
+      blur: Math.random() * 10 + 5,
+      xMovement: Math.random() * 20 - 10,
+    }))
   );
 
   return (
@@ -69,7 +66,7 @@ function FloatingParticles() {
 }
 
 // Parallax header with depth
-function ParallaxHeader({ scrollY, user, signOut }: { scrollY: any; user: any; signOut: () => void }) {
+function ParallaxHeader({ scrollY, user, signOut }: { scrollY: MotionValue<number>; user: User | null; signOut: () => void }) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
   const headerScale = useTransform(scrollY, [0, 200], [1, 0.95]);
