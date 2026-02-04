@@ -21,7 +21,8 @@ export function useAiKey(uid?: string | null) {
     async function loadKey() {
       setLoading(true);
       try {
-        const settingsRef = collection(db, "users", uid, "settings");
+        // uid is guaranteed to be a string here due to the check above
+        const settingsRef = collection(db, "users", uid!, "settings");
         const docRef = doc(settingsRef, "aiConfig");
         const docSnap = await getDoc(docRef);
         
@@ -54,6 +55,7 @@ export function useAiKey(uid?: string | null) {
     if (!uid) return;
     
     try {
+      // uid is guaranteed to be a string here due to the check above
       const settingsRef = collection(db, "users", uid, "settings");
       const docRef = doc(settingsRef, "aiConfig");
       if (!v) {
