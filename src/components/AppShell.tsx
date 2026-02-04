@@ -8,6 +8,7 @@ import { AuthCard } from "@/components/AuthCard";
 import { AiPanel } from "@/components/AiPanel";
 import { ChatComposer } from "@/components/ChatComposer";
 import { ChatFeed } from "@/components/ChatFeed";
+import { TimelineLog } from "@/components/TimelineLog";
 import { StatsBar } from "@/components/StatsBar";
 import { TimelineBar } from "@/components/TimelineBar";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -361,7 +362,7 @@ export function AppShell() {
             }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           >
-            <ChatFeed
+            <TimelineLog
               chats={sortedChats}
               loading={chatsLoading}
               error={error}
