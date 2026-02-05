@@ -12,19 +12,37 @@ function clampText(s: string, maxChars: number) {
 export function buildTimelineContext({
   months,
   chats,
-  maxChars = 24000,
+  maxChars = 32000,
 }: {
   months: MonthIndex[];
   chats: Chat[];
   maxChars?: number;
 }) {
-  const totalEntries = chats.length;
-  const oldest = chats[chats.length - 1]?.createdAt;
-  const newest = chats[0]?.createdAt;
+  const ordered = [...chats].sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const totalEntries = ordered.length;
+  const oldest = ordered[ordered.length - 1]?.createdAt;
+  const newest = ordered[0]?.createdAt;
+  const newestDayKey = ordered[0]?.dayKey;
   const range =
     oldest && newest ? `${format(oldest, "PPP")} → ${format(newest, "PPP")}` : "No entries yet";
 
-  const recent = chats.slice(0, 18);
+  const recent = ordered.slice(0, 30);
+  const recentDaySummary = (() => {
+    const dayMap = new Map<string, { date: Date; count: number }>();
+    for (const c of recent) {
+      const existing = dayMap.get(c.dayKey);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        dayMap.set(c.dayKey, { date: c.createdAt, count: 1 });
+      }
+    }
+    return [...dayMap.entries()]
+      .sort((a, b) => b[1].date.getTime() - a[1].date.getTime())
+      .slice(0, 7)
+      .map(([dayKey, info]) => `${dayKey} (${info.count} entry${info.count === 1 ? "" : "ies"})`)
+      .join(" | ");
+  })();
 
   const monthLines = months
     .slice(0, 24)
@@ -58,6 +76,8 @@ You answer ONLY using the user's timeline context below. If asked to “find X�
 
 TIMELINE RANGE: ${range}
 TOTAL ENTRIES: ${totalEntries}
+MOST RECENT DAY: ${newestDayKey ?? "Unknown"}
+RECENT DAY COUNTS: ${recentDaySummary || "No recent entries"}
 
 MONTH INDEX (condensed):
 ${[monthLines, olderLine].filter(Boolean).join("\n")}
@@ -68,5 +88,4 @@ ${recentLines}
 
   return clampText(context, maxChars);
 }
-
 

@@ -189,6 +189,61 @@ function ParallaxHeader({
   );
 }
 
+type BurstSpark = {
+  id: number;
+  angle: number;
+  distance: number;
+  size: number;
+  delay: number;
+};
+
+type SparkBurst = {
+  id: number;
+  x: number;
+  y: number;
+  sparks: BurstSpark[];
+};
+
+function CelebrationBurst({ burst }: { burst: SparkBurst }) {
+  const colors = [
+    "var(--neon-cyan)",
+    "var(--neon-purple)",
+    "var(--neon-pink)",
+    "var(--glow-cyan)",
+  ];
+  return (
+    <div className="fixed left-0 top-0 pointer-events-none z-50">
+      {burst.sparks.map((spark, index) => {
+        const x = Math.cos(spark.angle) * spark.distance;
+        const y = Math.sin(spark.angle) * spark.distance;
+        const color = colors[index % colors.length];
+        return (
+          <motion.div
+            key={spark.id}
+            className="absolute rounded-full"
+            style={{
+              left: burst.x,
+              top: burst.y,
+              width: spark.size,
+              height: spark.size,
+              background: `radial-gradient(circle, ${color}, transparent 70%)`,
+              boxShadow: `0 0 12px ${color}`,
+            }}
+            initial={{ opacity: 0, scale: 0.4, x: 0, y: 0 }}
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0.4, 1.3, 0.6],
+              x,
+              y,
+            }}
+            transition={{ duration: 0.9, delay: spark.delay, ease: [0.22, 1, 0.36, 1] }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function AppShell() {
   const { user, loading: authLoading, signOut, isGuest, isAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
@@ -198,6 +253,7 @@ export function AppShell() {
   const [highlightChatId, setHighlightChatId] = useState<string | null>(null);
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [showUndoBatch, setShowUndoBatch] = useState(false);
+  const [burst, setBurst] = useState<SparkBurst | null>(null);
   const [flight, setFlight] = useState<
     | null
     | {
@@ -219,6 +275,12 @@ export function AppShell() {
     const t = window.setTimeout(() => setHighlightChatId(null), 1300);
     return () => window.clearTimeout(t);
   }, [highlightChatId]);
+
+  useEffect(() => {
+    if (!burst) return;
+    const t = window.setTimeout(() => setBurst(null), 1100);
+    return () => window.clearTimeout(t);
+  }, [burst]);
 
   const sortedChats = [...chats].sort((a, b) =>
     sortMode === "newest" ? b.createdAtMs - a.createdAtMs : a.createdAtMs - b.createdAtMs,
@@ -314,8 +376,34 @@ export function AppShell() {
             }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            onAnimationComplete={() => setFlight(null)}
+            onAnimationComplete={() => {
+              setFlight(null);
+              setBurst({
+                id: Date.now(),
+                x: flight.endX,
+                y: flight.endY,
+                sparks: Array.from({ length: 14 }, (_, i) => ({
+                  id: i,
+                  angle: (Math.PI * 2 * i) / 14 + Math.random() * 0.5,
+                  distance: 36 + Math.random() * 34,
+                  size: 4 + Math.random() * 5,
+                  delay: Math.random() * 0.12,
+                })),
+              });
+            }}
           />
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {burst ? (
+          <motion.div
+            key={burst.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <CelebrationBurst burst={burst} />
+          </motion.div>
         ) : null}
       </AnimatePresence>
 
@@ -369,6 +457,16 @@ export function AppShell() {
               }}
               />
             </motion.div>
+            {user && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.6 }}
+                className="w-full max-w-5xl"
+              >
+                <AiPanel uid={user.uid} chats={chats} />
+              </motion.div>
+            )}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -430,66 +528,48 @@ export function AppShell() {
       </div>
 
       <div className="mx-auto w-full max-w-7xl relative z-10">
-        {/* Feed + AI + sort with fluid grid */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7, duration: 0.8 }}
-          className="grid grid-cols-1 gap-8 lg:grid-cols-[1.2fr_0.8fr]"
+          className="space-y-6"
         >
           <motion.div
-            animate={{
-              y: [0, -5, 0],
+            whileHover={{ scale: 1.01, y: -2 }}
+            className="rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl px-5 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+            style={{
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.1) inset",
             }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           >
-            <TimelineLog
-              chats={sortedChats}
-              loading={chatsLoading}
-              error={error}
-              highlightChatId={highlightChatId}
-              onDelete={isGuest ? undefined : async (id) => {
-                if (!user?.uid) return;
-                await deleteChat(user.uid, id);
-              }}
-            />
-          </motion.div>
-          <div className="space-y-6">
-            <motion.div
-              whileHover={{ scale: 1.02, y: -4 }}
-              className="rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl px-5 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-              style={{
-                boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.1) inset",
-              }}
-            >
-              <div className="flex items-center justify-between text-sm text-[var(--text-secondary)] font-sans">
-                <div className="inline-flex items-center gap-2">
-                  <ArrowDown01 className="h-4 w-4 text-[var(--neon-purple)]" />
-                  <span>Sort entries</span>
-                </div>
-                <div className="inline-flex gap-2">
-                  <SortButton
-                    label="Newest"
-                    active={sortMode === "newest"}
-                    onClick={() => setSortMode("newest")}
-                  />
-                  <SortButton
-                    label="Oldest"
-                    active={sortMode === "oldest"}
-                    onClick={() => setSortMode("oldest")}
-                  />
-                </div>
+            <div className="flex items-center justify-between text-sm text-[var(--text-secondary)] font-sans">
+              <div className="inline-flex items-center gap-2">
+                <ArrowDown01 className="h-4 w-4 text-[var(--neon-purple)]" />
+                <span>Sort entries</span>
               </div>
-            </motion.div>
-            <motion.div
-              animate={{
-                y: [0, 5, 0],
-              }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            >
-              {user && <AiPanel uid={user.uid} chats={chats} />}
-            </motion.div>
-          </div>
+              <div className="inline-flex gap-2">
+                <SortButton
+                  label="Newest"
+                  active={sortMode === "newest"}
+                  onClick={() => setSortMode("newest")}
+                />
+                <SortButton
+                  label="Oldest"
+                  active={sortMode === "oldest"}
+                  onClick={() => setSortMode("oldest")}
+                />
+              </div>
+            </div>
+          </motion.div>
+          <TimelineLog
+            chats={sortedChats}
+            loading={chatsLoading}
+            error={error}
+            highlightChatId={highlightChatId}
+            onDelete={isGuest ? undefined : async (id) => {
+              if (!user?.uid) return;
+              await deleteChat(user.uid, id);
+            }}
+          />
         </motion.div>
       </div>
     </div>

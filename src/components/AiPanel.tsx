@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud } from "lucide-react";
+import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud, ArrowLeft } from "lucide-react";
 import { useMemo, useState, useRef, useEffect } from "react";
 
 import { buildTimelineContext } from "@/lib/ai/context";
@@ -72,6 +72,7 @@ export function AiPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
+  const [keyEntryDismissed, setKeyEntryDismissed] = useState(false);
   const [aiMode, setAiMode] = useState<"local" | "pro">("local");
   const [webllmProgress, setWebllmProgress] = useState<string | null>(null);
   
@@ -103,6 +104,10 @@ export function AiPanel({
   // Determine effective mode and ready state
   const effectiveMode = aiMode;
   const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : hasKey) && !needsKey;
+  const shouldShowKeyEntry =
+    hydrated && effectiveMode === "pro" && (!hasKey || needsKey) && !keyEntryDismissed;
+  const shouldShowKeyHint =
+    hydrated && effectiveMode === "pro" && (!hasKey || needsKey) && keyEntryDismissed;
 
   async function ask() {
     const q = query.trim();
@@ -241,7 +246,7 @@ export function AiPanel({
           </motion.div>
         ) : null}
 
-        {hydrated && (!hasKey || needsKey) && effectiveMode === "pro" ? (
+        {shouldShowKeyEntry ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -259,7 +264,7 @@ export function AiPanel({
 
             <label className="block">
               <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
-                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> Gemini API Key
+                <KeyRound className="h-4 w-4 text-[var(--neon-purple)]" /> Gemini API Key (encrypted at rest)
               </span>
               <motion.input
                 value={keyDraft}
@@ -274,25 +279,91 @@ export function AiPanel({
               />
             </label>
 
-            <motion.button
-              disabled={busy}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                setNeedsKey(false);
-                setError(null);
-                setAiKey(keyDraft);
-                setKeyDraft("");
-              }}
-              className={cn(
-                "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
-                "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
-                "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
-                "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
-              )}
-            >
-              Save key
-            </motion.button>
+            <div className="flex flex-wrap gap-3">
+              <motion.button
+                disabled={busy || !keyDraft.trim()}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setNeedsKey(false);
+                  setKeyEntryDismissed(false);
+                  setError(null);
+                  setAiKey(keyDraft);
+                  setKeyDraft("");
+                }}
+                className={cn(
+                  "rounded-2xl px-5 py-3 font-sans text-sm font-bold text-[var(--bg-deep)]",
+                  "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",
+                  "shadow-[0_10px_40px_rgba(131,56,236,0.4)]",
+                  "hover:shadow-[0_15px_50px_rgba(131,56,236,0.5)] transition-all",
+                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                )}
+              >
+                Save key
+              </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    setNeedsKey(false);
+                    setKeyEntryDismissed(true);
+                    setKeyDraft("");
+                    setError(null);
+                    if (webGPUAvailable) {
+                      setAiMode("local");
+                    }
+                  }}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 px-4 py-3 text-sm font-sans text-[var(--text-secondary)]",
+                  "hover:text-[var(--text-primary)] hover:border-[var(--neon-cyan)] transition-colors",
+                )}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </motion.button>
+            </div>
+          </motion.div>
+        ) : null}
+
+        {shouldShowKeyHint ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/70 px-5 py-4 text-sm text-[var(--text-secondary)]"
+          >
+            <div className="flex flex-col gap-3">
+              <div>
+                Pro mode needs an API key. You can keep using Local mode or add a key when you're ready.
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    setKeyEntryDismissed(false);
+                    setNeedsKey(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 px-4 py-2 text-xs font-sans text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-purple)] transition-colors"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Enter API key
+                </motion.button>
+                {webGPUAvailable && (
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      setAiMode("local");
+                      setKeyEntryDismissed(false);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 px-4 py-2 text-xs font-sans text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--neon-cyan)] transition-colors"
+                  >
+                    <Cpu className="h-3.5 w-3.5" />
+                    Use Local mode
+                  </motion.button>
+                )}
+              </div>
+            </div>
           </motion.div>
         ) : null}
 
@@ -300,7 +371,7 @@ export function AiPanel({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col h-[500px]"
+            className="flex flex-col h-[520px]"
           >
             {/* Mode Selection and Settings */}
             <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-[var(--line)]">
@@ -309,7 +380,10 @@ export function AiPanel({
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setAiMode("local")}
+                  onClick={() => {
+                    setAiMode("local");
+                    setKeyEntryDismissed(false);
+                  }}
                   disabled={!webGPUAvailable}
                   className={cn(
                     "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
@@ -321,12 +395,15 @@ export function AiPanel({
                   title={!webGPUAvailable ? "WebGPU not available in your browser" : "Free local AI using WebLLM"}
                 >
                   <Cpu className="h-3.5 w-3.5" />
-                  Local
+                  Local (Qwen)
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setAiMode("pro")}
+                  onClick={() => {
+                    setAiMode("pro");
+                    setKeyEntryDismissed(false);
+                  }}
                   className={cn(
                     "rounded-xl px-4 py-2 text-xs font-sans border transition-all duration-200 flex items-center gap-2",
                     aiMode === "pro"
@@ -348,6 +425,7 @@ export function AiPanel({
                   onClick={() => {
                     clearAiKey();
                     setNeedsKey(true);
+                    setKeyEntryDismissed(false);
                   }}
                   className="text-xs font-sans text-[var(--text-secondary)] underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors ml-auto"
                 >
@@ -374,10 +452,10 @@ export function AiPanel({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     className={cn(
-                      "rounded-2xl px-4 py-3 text-[15px] leading-7",
+                      "rounded-2xl px-4 py-3 text-[15px] leading-7 w-full",
                       msg.role === "user"
-                        ? "bg-gradient-to-r from-[var(--neon-cyan)]/20 to-[var(--neon-purple)]/20 border border-[var(--neon-cyan)]/30 ml-8"
-                        : "bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)] mr-8"
+                        ? "bg-gradient-to-r from-[var(--neon-cyan)]/20 to-[var(--neon-purple)]/20 border border-[var(--neon-cyan)]/30"
+                        : "bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)]"
                     )}
                     style={{
                       boxShadow: msg.role === "user"
@@ -398,7 +476,7 @@ export function AiPanel({
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="rounded-2xl bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)] px-4 py-3 mr-8"
+                  className="rounded-2xl bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-[var(--line)] px-4 py-3 w-full"
                   style={{
                     boxShadow: "0 0 20px rgba(0,0,0,0.3)",
                   }}
@@ -423,7 +501,7 @@ export function AiPanel({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
-                    className="rounded-2xl border border-[var(--neon-cyan)]/50 bg-[var(--bg-surface)]/80 px-4 py-2 text-xs text-[var(--text-secondary)] flex items-center gap-2"
+                    className="rounded-2xl border border-[var(--neon-cyan)]/50 bg-[var(--bg-surface)]/80 px-4 py-2 text-xs text-[var(--text-secondary)] flex items-center gap-2 w-full"
                   >
                     <Cpu className="h-3.5 w-3.5 text-[var(--neon-cyan)]" />
                     {webllmProgress}
@@ -438,7 +516,7 @@ export function AiPanel({
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 6 }}
-                    className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)]"
+                    className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)] w-full"
                     style={{
                       boxShadow: "0 0 20px rgba(255,0,110,0.3)",
                     }}
@@ -464,7 +542,7 @@ export function AiPanel({
                       void ask();
                     }
                   }}
-                  placeholder='Ask about your timeline...'
+                  placeholder="Ask about your timeline..."
                   whileFocus={{ scale: 1.01 }}
                   className="flex-1 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3 font-sans text-[15px] text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all"
                   style={{
@@ -484,7 +562,7 @@ export function AiPanel({
                     "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
                   )}
                 >
-                  Send
+                  Ask
                 </motion.button>
               </div>
             </div>
