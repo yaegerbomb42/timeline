@@ -46,6 +46,15 @@ function GlowingDot({
   // Format date for display
   const dateLabel = format(chat.createdAt, "MMM d");
   const timeLabel = format(chat.createdAt, "h:mm a");
+  
+  // Label positioning constants
+  // When yOffset < -100 (dot is high on rollercoaster), place label below to avoid overlap with top edge
+  // Otherwise place label above the dot for better visibility
+  const LABEL_ABOVE_DOT = '-32px';
+  const LABEL_BELOW_DOT = 'calc(100% + 8px)';
+  const MOOD_ABOVE_DOT = '-60px';
+  const MOOD_BELOW_DOT = 'calc(100% + 32px)';
+  const HIGH_POSITION_THRESHOLD = -100;
     
   return (
     <div className="relative group/dot">
@@ -107,7 +116,7 @@ function GlowingDot({
       {/* Date label that shows on group hover - aria-hidden as info is in button's aria-label */}
       <div
         className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
-        style={{ top: yOffset < -100 ? 'calc(100% + 8px)' : '-32px' }}
+        style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? LABEL_BELOW_DOT : LABEL_ABOVE_DOT }}
         aria-hidden="true"
       >
         <div 
@@ -128,7 +137,7 @@ function GlowingDot({
       {chat.moodAnalysis && (
         <div
           className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
-          style={{ top: yOffset < -100 ? '-60px' : 'calc(100% + 32px)' }}
+          style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? MOOD_ABOVE_DOT : MOOD_BELOW_DOT }}
           aria-hidden="true"
         >
           <div className="text-lg">{chat.moodAnalysis.emoji}</div>
@@ -266,8 +275,9 @@ export function TimelineBar({
                     const x = idx * slotWidth + slotWidth / 2;
                     return day.chats.map((chat) => {
                       // Calculate Y position based on mood rating (1-100)
-                      // Rating 1 (sad) -> bottom (y=230), Rating 100 (happy) -> top (y=30)
-                      // Adjusted for better visual range
+                      // Canvas coordinates: lower Y = top of screen, higher Y = bottom of screen
+                      // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
+                      // This creates the "rollercoaster" effect with happy moments at peaks
                       const rating = chat.moodAnalysis?.rating ?? 50;
                       const y = 230 - ((rating - 1) / 99) * 200;
                       return { x, y };
@@ -388,8 +398,9 @@ export function TimelineBar({
                     <AnimatePresence initial={false}>
                       {marks.map((c) => {
                         // Calculate Y offset based on mood rating (1-100)
+                        // Canvas coordinates: lower Y = top, higher Y = bottom
                         // Rating 1 (sad) -> bottom, Rating 100 (happy) -> top
-                        // Adjusted to match the path calculation
+                        // Adjusted to match the path calculation for perfect alignment
                         const rating = c.moodAnalysis?.rating ?? 50;
                         const yOffset = -30 - ((rating - 1) / 99) * 200;
                         
