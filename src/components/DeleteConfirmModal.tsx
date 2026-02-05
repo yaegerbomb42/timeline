@@ -98,7 +98,7 @@ export function DeleteConfirmModal({
                     Delete this entry?
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] font-sans">
-                    This will archive the entry (kept for last 30 deletions). You can restore it from the admin panel if needed.
+                    This will archive the entry (kept for last 30 deletions). Archived entries can be viewed in the admin panel.
                   </p>
                   {entryPreview ? (
                     <motion.div

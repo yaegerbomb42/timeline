@@ -283,8 +283,8 @@ export async function addBatchChats(
   const batchId = `batch_${Date.now()}`;
   const chatIds: string[] = [];
 
-  // Dynamic rate limiting: start fast, slow down if needed
-  let delayMs = 50; // Start with 50ms
+  // Dynamic rate limiting: start at 50ms, speed up on success, slow down on errors
+  let delayMs = 50; // Start with 50ms (will decrease to 25ms minimum on success)
   let consecutiveSuccesses = 0;
 
   // Process entries with rate limiting (delay between AI calls)
@@ -304,9 +304,9 @@ export async function addBatchChats(
       moodAnalysis = analyzeMoodDetailed(entry.content);
       consecutiveSuccesses++;
       
-      // Speed up if we have multiple successes (down to minimum 25ms)
+      // Speed up more aggressively if we have multiple successes (down to minimum 25ms)
       if (consecutiveSuccesses >= 3 && delayMs > 25) {
-        delayMs = Math.max(25, delayMs - 10);
+        delayMs = Math.max(25, delayMs - 15);
       }
     } catch (err) {
       // If AI analysis fails, use defaults and slow down
