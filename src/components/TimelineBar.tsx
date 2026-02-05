@@ -48,13 +48,19 @@ function GlowingDot({
   const timeLabel = format(chat.createdAt, "h:mm a");
   
   // Label positioning constants
+  // Spacing values chosen for optimal visual separation and readability
+  const DOT_SIZE = 16; // Base size of the timeline dot (from dotPx calculation)
+  const LABEL_VERTICAL_SPACING = 32; // Space between dot edge and label (2x dot size for comfortable gap)
+  const LABEL_MARGIN = 8; // Small margin when label is placed below dot
+  const MOOD_LABEL_OFFSET = 60; // Extra space for mood emoji/rating label
+  
   // When yOffset < -100 (dot is high on rollercoaster), place label below to avoid overlap with top edge
   // Otherwise place label above the dot for better visibility
-  const LABEL_ABOVE_DOT = '-32px';
-  const LABEL_BELOW_DOT = 'calc(100% + 8px)';
-  const MOOD_ABOVE_DOT = '-60px';
-  const MOOD_BELOW_DOT = 'calc(100% + 32px)';
-  const HIGH_POSITION_THRESHOLD = -100;
+  const LABEL_ABOVE_DOT = `-${LABEL_VERTICAL_SPACING}px`;
+  const LABEL_BELOW_DOT = `calc(100% + ${LABEL_MARGIN}px)`;
+  const MOOD_ABOVE_DOT = `-${MOOD_LABEL_OFFSET}px`;
+  const MOOD_BELOW_DOT = `calc(100% + ${LABEL_VERTICAL_SPACING}px)`;
+  const HIGH_POSITION_THRESHOLD = -100; // Y offset where we switch label position
     
   return (
     <div className="relative group/dot">
@@ -294,7 +300,8 @@ export function TimelineBar({
                     const curr = points[i]!;
                     
                     // Calculate control points for smooth curve
-                    // Use tension to control how tight the curves are
+                    // Tension factor controls curve smoothness: 0.0 = sharp angles, 1.0 = very smooth
+                    // 0.4 chosen as optimal balance: smooth flow without overshooting or flattening
                     const tension = 0.4;
                     const dx = curr.x - prev.x;
                     
