@@ -237,11 +237,14 @@ function EntryCard({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.04 + 0.05, duration: 0.4 }}
                 className="inline-flex items-center gap-2 rounded-xl px-3 py-1 border border-[var(--line)] bg-[var(--bg-surface)]/50"
-                title={`Mood: ${chat.moodAnalysis.mood}`}
+                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}`}
               >
                 <span className="text-lg">{chat.moodAnalysis.emoji}</span>
                 <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">
-                  {chat.moodAnalysis.rating}/10
+                  {chat.moodAnalysis.rating}/100
+                </span>
+                <span className="text-xs text-[var(--text-secondary)] italic capitalize">
+                  {chat.moodAnalysis.description}
                 </span>
               </motion.div>
             )}

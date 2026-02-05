@@ -19,12 +19,10 @@ export function BatchImportModal({
   const [entries, setEntries] = useState<BatchImportEntry[]>([]);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  async function processFile(file: File) {
     setState("parsing");
     setError(null);
 
@@ -44,6 +42,41 @@ export function BatchImportModal({
       setError(err instanceof Error ? err.message : "Failed to parse file");
       setState("error");
     }
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.txt')) {
+      setError("Please upload a .txt file");
+      setState("error");
+      return;
+    }
+
+    await processFile(file);
   }
 
   async function handleImport() {
@@ -127,7 +160,11 @@ export function BatchImportModal({
 
           {/* File upload */}
           {entries.length === 0 && state !== "uploading" && state !== "success" ? (
-            <div>
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -141,8 +178,11 @@ export function BatchImportModal({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={state === "parsing"}
                 className={cn(
-                  "w-full rounded-2xl border-2 border-dashed border-[var(--line)]",
-                  "bg-[var(--bg-surface)]/40 px-6 py-12 flex flex-col items-center gap-4",
+                  "w-full rounded-2xl border-2 border-dashed",
+                  isDragging 
+                    ? "border-[var(--neon-cyan)] bg-[var(--neon-cyan)]/20"
+                    : "border-[var(--line)] bg-[var(--bg-surface)]/40",
+                  "px-6 py-12 flex flex-col items-center gap-4",
                   "hover:border-[var(--neon-cyan)] hover:bg-[var(--bg-surface)]/60 transition-all",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
