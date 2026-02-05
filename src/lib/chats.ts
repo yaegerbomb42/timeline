@@ -28,6 +28,12 @@ export type Chat = {
   mood?: Mood;
   moodAnalysis?: MoodAnalysis;
   imageUrl?: string;
+  batchId?: string; // For tracking batch imports
+};
+
+export type BatchImportEntry = {
+  date: string; // YYYY-MM-DD
+  content: string;
 };
 
 function makeExcerpt(text: string, max = 220) {
@@ -174,6 +180,7 @@ export function useChats(uid?: string) {
             mood,
             moodAnalysis,
             imageUrl: data.imageUrl,
+            batchId: data.batchId,
           };
         });
         setChats(items);
@@ -197,6 +204,236 @@ export function useChats(uid?: string) {
   }, [chats]);
 
   return { chats, groupedByDay, loading, error };
+}
+
+/**
+ * Parse a batch import file according to the specified format:
+ * - Records separated by ~`~ on its own line
+ * - Each record: YYYY-MM-DD : content (content can be multiline)
+ */
+export function parseBatchImport(text: string): BatchImportEntry[] {
+  // Split by the separator pattern: newline, ~`~, newline
+  const chunks = text.split(/\r?\n~`~\r?\n/);
+  const entries: BatchImportEntry[] = [];
+
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+
+    // Split on the first occurrence of " : "
+    const separatorIndex = trimmed.indexOf(" : ");
+    if (separatorIndex === -1) continue;
+
+    const date = trimmed.slice(0, separatorIndex).trim();
+    const content = trimmed.slice(separatorIndex + 3).trim();
+
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+    entries.push({ date, content });
+  }
+
+  return entries;
+}
+
+/**
+ * Add multiple entries from a batch import with rate limiting for AI analysis
+ */
+export async function addBatchChats(
+  uid: string,
+  entries: BatchImportEntry[],
+  onProgress?: (current: number, total: number) => void,
+): Promise<{ batchId: string; chatIds: string[] }> {
+  const batchId = `batch_${Date.now()}`;
+  const chatIds: string[] = [];
+
+  // Process entries with rate limiting (delay between AI calls)
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    
+    // Parse the date
+    const entryDate = new Date(entry.date + "T12:00:00");
+    const dayKey = format(entryDate, "yyyy-MM-dd");
+    const monthKey = dayKey.slice(0, 7);
+    const excerpt = makeExcerpt(entry.content);
+    
+    // Analyze mood with small delay to avoid rate limiting
+    const mood = analyzeMood(entry.content);
+    const moodAnalysis = analyzeMoodDetailed(entry.content);
+    
+    // Create the document
+    const docData: Record<string, unknown> = {
+      text: entry.content,
+      excerpt,
+      dayKey,
+      mood,
+      moodAnalysis,
+      createdAtLocal: entryDate.toISOString(),
+      createdAt: serverTimestamp(),
+      batchId, // Track which batch this belongs to
+      v: 1,
+    };
+
+    const docRef = await addDoc(collection(db, "users", uid, "chats"), docData);
+    chatIds.push(docRef.id);
+
+    // Update AI month index (same as addChat)
+    try {
+      const monthRef = doc(db, "users", uid, "ai_months", monthKey);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(monthRef);
+        const data = snap.exists() ? (snap.data() as any) : {};
+        const prevCount = Number(data.count ?? 0);
+        const nextCount = prevCount + 1;
+
+        const prevSamples: unknown = data.samples;
+        const samples = Array.isArray(prevSamples) ? prevSamples.filter((s) => typeof s === "string") : [];
+        const k = 10;
+        const nextSamples = [...samples];
+        if (nextSamples.length < k) {
+          nextSamples.push(excerpt);
+        } else if (nextSamples.length > 0) {
+          const idx = hashString(docRef.id) % nextSamples.length;
+          nextSamples[idx] = excerpt;
+        }
+
+        const nowIso = entryDate.toISOString();
+        const prevFirst = typeof data.firstAtLocal === "string" ? data.firstAtLocal : nowIso;
+        const prevLast = typeof data.lastAtLocal === "string" ? data.lastAtLocal : nowIso;
+        const firstAtLocal = prevFirst < nowIso ? prevFirst : nowIso;
+        const lastAtLocal = prevLast > nowIso ? prevLast : nowIso;
+
+        tx.set(
+          monthRef,
+          {
+            monthKey,
+            count: nextCount,
+            samples: nextSamples.slice(0, k),
+            firstAtLocal,
+            lastAtLocal,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      });
+    } catch {
+      // ignore
+    }
+
+    // Report progress
+    onProgress?.(i + 1, entries.length);
+
+    // Rate limiting: small delay between entries to avoid overwhelming AI services
+    if (i < entries.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  // Store batch metadata for undo functionality
+  try {
+    await addDoc(collection(db, "users", uid, "batches"), {
+      batchId,
+      chatIds,
+      entryCount: entries.length,
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Failed to store batch metadata:", err);
+  }
+
+  return { batchId, chatIds };
+}
+
+/**
+ * Delete all entries from a specific batch import
+ */
+export async function deleteBatch(uid: string, batchId: string): Promise<number> {
+  // First, find all chats with this batchId
+  const chatsSnapshot = await query(
+    collection(db, "users", uid, "chats"),
+  );
+  
+  // We need to query for chats with this batchId
+  // Since Firestore queries need to be constructed differently, we'll fetch all and filter
+  // This is not ideal for large datasets, but works for the use case
+  
+  let deletedCount = 0;
+  
+  return new Promise((resolve, reject) => {
+    const q = query(collection(db, "users", uid, "chats"));
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        unsubscribe(); // Unsubscribe immediately after first fetch
+        
+        const deletePromises = snapshot.docs
+          .filter(doc => doc.data().batchId === batchId)
+          .map(doc => deleteDoc(doc.ref));
+        
+        try {
+          await Promise.all(deletePromises);
+          deletedCount = deletePromises.length;
+          
+          // Delete batch metadata
+          const batchQuery = query(collection(db, "users", uid, "batches"));
+          const batchSnap = await new Promise<any>((res, rej) => {
+            const unsub = onSnapshot(batchQuery, (snap) => {
+              unsub();
+              res(snap);
+            }, rej);
+          });
+          
+          const batchDocToDelete = batchSnap.docs.find((d: any) => d.data().batchId === batchId);
+          if (batchDocToDelete) {
+            await deleteDoc(batchDocToDelete.ref);
+          }
+          
+          resolve(deletedCount);
+        } catch (err) {
+          reject(err);
+        }
+      },
+      (error) => {
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
+ * Get list of recent batch imports for undo functionality
+ */
+export function useBatches(uid?: string) {
+  const [batches, setBatches] = useState<Array<{
+    id: string;
+    batchId: string;
+    entryCount: number;
+    createdAt: Date;
+  }>>([]);
+
+  useEffect(() => {
+    if (!uid) return;
+
+    const q = query(
+      collection(db, "users", uid, "batches"),
+      orderBy("createdAt", "desc")
+    );
+
+    return onSnapshot(q, (snap) => {
+      const items = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          batchId: data.batchId,
+          entryCount: data.entryCount || 0,
+          createdAt: data.createdAt?.toDate?.() ?? new Date(),
+        };
+      });
+      setBatches(items);
+    });
+  }, [uid]);
+
+  return batches;
 }
 
 
