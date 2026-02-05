@@ -53,7 +53,6 @@ function getMoodDescription(rating: number, mood: Mood): string {
     // neutral
     if (rating >= 55) return 'taking things in stride';
     if (rating >= 50) return 'going through the motions';
-    if (rating <= 45) return 'feeling meh';
     return 'existing';
   }
 }
@@ -73,10 +72,10 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
   
   if (score > 3) {
     mood = 'positive';
-    emoji = rating >= 90 ? '😄' : rating >= 75 ? '😊' : rating >= 60 ? '🙂' : '🙂';
+    emoji = rating >= 90 ? '😄' : rating >= 75 ? '😊' : '🙂';
   } else if (score < -3) {
     mood = 'negative';
-    emoji = rating <= 10 ? '😢' : rating <= 25 ? '😔' : rating <= 40 ? '😐' : '😐';
+    emoji = rating <= 10 ? '😢' : rating <= 25 ? '😔' : '😐';
   } else {
     mood = 'neutral';
     emoji = '😐';
@@ -120,7 +119,6 @@ export function getMoodEmoji(rating: number): string {
   if (rating >= 75) return '😊';
   if (rating >= 60) return '🙂';
   if (rating >= 50) return '😐';
-  if (rating >= 40) return '😐';
   if (rating >= 25) return '😔';
   if (rating >= 10) return '☹️';
   return '😢';
