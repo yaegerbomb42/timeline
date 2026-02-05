@@ -64,8 +64,9 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
   const score = result.score;
   
   // Improved normalization with better distribution
-  // Sentiment scores typically range from -15 to +15 for emotionally charged text
-  // We'll use a sigmoid-like function for better distribution across the 1-100 scale
+  // The sentiment library typically produces scores from -10 to +10 for normal text,
+  // but can go higher for very emotionally charged content. We clamp to -15/+15
+  // to handle extreme cases while maintaining good distribution across the 1-100 scale.
   const clampedScore = Math.max(-15, Math.min(15, score));
   
   // More sophisticated mapping for better accuracy

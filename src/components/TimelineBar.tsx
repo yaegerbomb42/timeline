@@ -52,6 +52,7 @@ function GlowingDot({
       <motion.button
         type="button"
         onClick={onClick}
+        aria-label={`${format(chat.createdAt, "MMMM d, yyyy 'at' h:mm a")}${chat.moodAnalysis ? `, Mood: ${chat.moodAnalysis.description}, Rating: ${chat.moodAnalysis.rating} out of 100` : ''}`}
         title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}` : ''}`}
         initial={{ opacity: 0, scale: 0.3, y: 10 }}
         animate={{
@@ -103,10 +104,11 @@ function GlowingDot({
         )}
       </motion.button>
       
-      {/* Date label that shows on group hover */}
+      {/* Date label that shows on group hover - aria-hidden as info is in button's aria-label */}
       <div
         className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
         style={{ top: yOffset < -100 ? 'calc(100% + 8px)' : '-32px' }}
+        aria-hidden="true"
       >
         <div 
           className="text-[10px] font-mono font-semibold px-2 py-1 rounded-md"
@@ -122,11 +124,12 @@ function GlowingDot({
         </div>
       </div>
       
-      {/* Show mood info on group hover */}
+      {/* Show mood info on group hover - aria-hidden as info is in button's aria-label */}
       {chat.moodAnalysis && (
         <div
           className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
           style={{ top: yOffset < -100 ? '-60px' : 'calc(100% + 32px)' }}
+          aria-hidden="true"
         >
           <div className="text-lg">{chat.moodAnalysis.emoji}</div>
           <div className="text-[10px] font-mono text-[var(--text-secondary)]">
