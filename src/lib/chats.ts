@@ -536,4 +536,61 @@ export function useDeletedArchive(uid?: string) {
   return deletedChats;
 }
 
+/**
+ * Bulk delete chats based on a time range
+ * @param uid User ID
+ * @param days Number of days back to delete (undefined = all)
+ * @returns Number of entries deleted
+ */
+export async function bulkDeleteChats(uid: string, days?: number): Promise<number> {
+  const q = query(collection(db, "users", uid, "chats"));
+  const snapshot = await getDocs(q);
+  
+  const now = new Date();
+  const cutoffTime = days ? now.getTime() - (days * 24 * 60 * 60 * 1000) : 0;
+  
+  let deletedCount = 0;
+  
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    const createdAt = data.createdAt?.toDate?.() ?? 
+                      (data.createdAtLocal ? new Date(data.createdAtLocal) : new Date());
+    
+    // If days is undefined, delete all. Otherwise, check if within range
+    if (!days || createdAt.getTime() >= cutoffTime) {
+      // Archive before deleting
+      try {
+        await addDoc(collection(db, "users", uid, "deleted_archive"), {
+          ...data,
+          originalId: docSnap.id,
+          deletedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error("Failed to archive entry:", err);
+        // Continue with deletion even if archiving fails
+      }
+      
+      await deleteDoc(docSnap.ref);
+      deletedCount++;
+    }
+  }
+  
+  // Clean up old archives (keep only last 30)
+  try {
+    const archiveQuery = query(
+      collection(db, "users", uid, "deleted_archive"),
+      orderBy("deletedAt", "desc")
+    );
+    const archiveSnap = await getDocs(archiveQuery);
+    const toDelete = archiveSnap.docs.slice(30);
+    for (const docToDelete of toDelete) {
+      await deleteDoc(docToDelete.ref);
+    }
+  } catch (err) {
+    console.error("Failed to clean up archive:", err);
+  }
+  
+  return deletedCount;
+}
+
 
