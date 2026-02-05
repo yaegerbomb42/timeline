@@ -487,7 +487,7 @@ export function AppShell() {
               }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
             >
-              <AiPanel uid={user.uid} chats={chats} />
+              {user && <AiPanel uid={user.uid} chats={chats} />}
             </motion.div>
           </div>
         </motion.div>
