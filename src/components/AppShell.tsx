@@ -367,7 +367,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen px-6 py-10 relative overflow-hidden">
-      <FloatingParticles />
+      {/* Background removed - no floating particles */}
       
       {/* Batch Import Modal */}
       <AnimatePresence>
