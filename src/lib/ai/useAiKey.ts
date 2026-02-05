@@ -18,10 +18,10 @@ export function useAiKey(uid?: string | null) {
 
     let cancelled = false;
     
-    async function loadKey() {
+    async function loadKey(userId: string) {
       setLoading(true);
       try {
-        const settingsRef = collection(db, "users", uid, "settings");
+        const settingsRef = collection(db, "users", userId, "settings");
         const docRef = doc(settingsRef, "aiConfig");
         const docSnap = await getDoc(docRef);
         
@@ -40,7 +40,7 @@ export function useAiKey(uid?: string | null) {
       }
     }
 
-    void loadKey();
+    void loadKey(uid);
 
     return () => {
       cancelled = true;
