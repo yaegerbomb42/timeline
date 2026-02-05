@@ -100,3 +100,15 @@ All entries are automatically analyzed for sentiment:
   - Cyan: Neutral mood
 
 The Timeline Rollercoaster uses these ratings to position entries vertically, creating a visual representation of your emotional journey over time.
+
+## Important: Bulk Delete Behavior
+
+The **Bulk Delete** admin feature is designed specifically for managing batch-imported entries:
+
+- ✅ **ONLY deletes entries created through batch imports** (entries with a `batchId`)
+- ❌ **Does NOT delete manually created entries** (entries added through the UI)
+- 🗄️ **Archives entries for 30 days** before permanent deletion
+- 🔍 **Shows detailed batch information** (date imported, entry count, batch ID)
+- ☑️ **Allows selective deletion** (choose specific batches or all batches)
+
+This ensures you can safely remove bulk-imported data without affecting your manually created timeline entries. All deletions are recoverable from the archive for 30 days.

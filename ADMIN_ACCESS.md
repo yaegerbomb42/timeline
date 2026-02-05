@@ -28,15 +28,39 @@
        ```
    
    - **Bulk Delete** (Pink button with Trash icon)
-     - Delete multiple entries at once
-     - Options: Last 7 days, Last 30 days, or All entries
-     - Entries are archived before deletion
+     - **ONLY deletes batch-imported entries** (entries with a batchId)
+     - Select which batch imports to delete
+     - Shows batch details: date imported, number of entries
+     - Can select individual batches or all batches
+     - Entries are archived for 30 days before permanent deletion
+     - **Does NOT delete manually created entries**
    
    - **Undo Batch** (Purple button with Undo icon)
      - Undo recent batch imports
    
    - **Archive** (Purple button with Archive icon)
      - View deleted entries (last 30 retained)
+     - After 30 days in archive, entries are permanently deleted
+
+## Bulk Delete Details
+
+**Important**: The bulk delete feature ONLY removes entries that were created through batch imports. It will NOT delete:
+- Manually entered timeline entries
+- Entries created through the regular entry composer
+- Any entries without a batchId
+
+**How it works:**
+1. Click "Bulk Delete" button
+2. See a list of all batch imports with:
+   - Import date and time
+   - Number of entries in each batch
+   - Batch ID (last 8 characters)
+3. Select which batches to delete (individual or all)
+4. Confirm deletion
+5. Entries are moved to archive (retained for 30 days)
+6. After 30 days, archived entries are permanently deleted
+
+This ensures you can safely remove bulk-imported data without affecting manually created entries.
 
 ## Layout Structure
 

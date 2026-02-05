@@ -537,42 +537,40 @@ export function useDeletedArchive(uid?: string) {
 }
 
 /**
- * Bulk delete chats based on a time range
+ * Bulk delete chats that came from batch imports
  * @param uid User ID
- * @param days Number of days back to delete (undefined = all)
+ * @param batchIds Optional array of specific batch IDs to delete. If undefined, deletes all batch-imported entries
  * @returns Number of entries deleted
  */
-export async function bulkDeleteChats(uid: string, days?: number): Promise<number> {
+export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise<number> {
   const q = query(collection(db, "users", uid, "chats"));
   const snapshot = await getDocs(q);
-  
-  const now = new Date();
-  const cutoffTime = days ? now.getTime() - (days * 24 * 60 * 60 * 1000) : 0;
   
   let deletedCount = 0;
   
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
-    const createdAt = data.createdAt?.toDate?.() ?? 
-                      (data.createdAtLocal ? new Date(data.createdAtLocal) : new Date());
     
-    // If days is undefined, delete all. Otherwise, check if within range
-    if (!days || createdAt.getTime() >= cutoffTime) {
-      // Archive before deleting
-      try {
-        await addDoc(collection(db, "users", uid, "deleted_archive"), {
-          ...data,
-          originalId: docSnap.id,
-          deletedAt: serverTimestamp(),
-        });
-      } catch (err) {
-        console.error("Failed to archive entry:", err);
-        // Continue with deletion even if archiving fails
-      }
-      
-      await deleteDoc(docSnap.ref);
-      deletedCount++;
+    // Only delete entries that have a batchId (came from bulk import)
+    if (!data.batchId) continue;
+    
+    // If specific batchIds provided, only delete those
+    if (batchIds && !batchIds.includes(data.batchId)) continue;
+    
+    // Archive before deleting
+    try {
+      await addDoc(collection(db, "users", uid, "deleted_archive"), {
+        ...data,
+        originalId: docSnap.id,
+        deletedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Failed to archive entry:", err);
+      // Continue with deletion even if archiving fails
     }
+    
+    await deleteDoc(docSnap.ref);
+    deletedCount++;
   }
   
   // Clean up old archives (keep only last 30)
@@ -591,6 +589,27 @@ export async function bulkDeleteChats(uid: string, days?: number): Promise<numbe
   }
   
   return deletedCount;
+}
+
+/**
+ * Get count of entries for each batch
+ * @param uid User ID
+ * @returns Map of batchId to entry count
+ */
+export async function getBatchEntryCounts(uid: string): Promise<Map<string, number>> {
+  const q = query(collection(db, "users", uid, "chats"));
+  const snapshot = await getDocs(q);
+  
+  const counts = new Map<string, number>();
+  
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    if (data.batchId) {
+      counts.set(data.batchId, (counts.get(data.batchId) || 0) + 1);
+    }
+  }
+  
+  return counts;
 }
 
 

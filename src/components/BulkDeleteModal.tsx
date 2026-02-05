@@ -1,12 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Trash2, X, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Trash2, X, AlertCircle, CheckCircle, Loader2, Package } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { bulkDeleteChats } from "@/lib/chats";
+import { bulkDeleteChats, useBatches, getBatchEntryCounts } from "@/lib/chats";
+import { format } from "date-fns";
 
-type DeleteState = "idle" | "confirm" | "deleting" | "success" | "error";
+type DeleteState = "idle" | "loading" | "confirm" | "deleting" | "success" | "error";
 
 export function BulkDeleteModal({
   uid,
@@ -15,10 +16,50 @@ export function BulkDeleteModal({
   uid: string;
   onClose: () => void;
 }) {
-  const [state, setState] = useState<DeleteState>("idle");
+  const [state, setState] = useState<DeleteState>("loading");
   const [deleteCount, setDeleteCount] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOption, setSelectedOption] = useState<"all" | "last7" | "last30">("last7");
+  const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
+  const batches = useBatches(uid);
+  const [batchCounts, setBatchCounts] = useState<Map<string, number>>(new Map());
+
+  // Load actual entry counts for each batch
+  useEffect(() => {
+    async function loadCounts() {
+      try {
+        const counts = await getBatchEntryCounts(uid);
+        setBatchCounts(counts);
+        setState("idle");
+      } catch (err) {
+        console.error("Failed to load batch counts:", err);
+        setState("idle");
+      }
+    }
+    loadCounts();
+  }, [uid]);
+
+  const toggleBatch = (batchId: string) => {
+    const newSet = new Set(selectedBatches);
+    if (newSet.has(batchId)) {
+      newSet.delete(batchId);
+    } else {
+      newSet.add(batchId);
+    }
+    setSelectedBatches(newSet);
+  };
+
+  const selectAll = () => {
+    setSelectedBatches(new Set(batches.map(b => b.batchId)));
+  };
+
+  const deselectAll = () => {
+    setSelectedBatches(new Set());
+  };
+
+  const totalSelectedEntries = Array.from(selectedBatches).reduce(
+    (sum, batchId) => sum + (batchCounts.get(batchId) || 0),
+    0
+  );
 
   async function handleDelete() {
     if (state === "idle") {
@@ -30,20 +71,8 @@ export function BulkDeleteModal({
     setError(null);
 
     try {
-      let days: number | undefined;
-      switch (selectedOption) {
-        case "last7":
-          days = 7;
-          break;
-        case "last30":
-          days = 30;
-          break;
-        case "all":
-          days = undefined;
-          break;
-      }
-
-      const count = await bulkDeleteChats(uid, days);
+      const batchIdsToDelete = Array.from(selectedBatches);
+      const count = await bulkDeleteChats(uid, batchIdsToDelete);
       setDeleteCount(count);
       setState("success");
       setTimeout(() => {
@@ -68,7 +97,7 @@ export function BulkDeleteModal({
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/95 backdrop-blur-2xl shadow-[0_30px_80px_rgba(0,0,0,0.6)] overflow-hidden"
+        className="w-full max-w-2xl rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/95 backdrop-blur-2xl shadow-[0_30px_80px_rgba(0,0,0,0.6)] overflow-hidden"
       >
         {/* Header */}
         <div className="px-8 pt-8 pb-6 border-b border-[var(--line)]">
@@ -79,10 +108,10 @@ export function BulkDeleteModal({
               </div>
               <div>
                 <h2 className="font-sans text-xl font-bold text-[var(--text-primary)]">
-                  Bulk Delete
+                  Delete Batch Imports
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  Remove multiple timeline entries
+                  Remove bulk-imported timeline entries
                 </p>
               </div>
             </div>
@@ -99,102 +128,123 @@ export function BulkDeleteModal({
 
         {/* Content */}
         <div className="px-8 py-6">
-          {state === "idle" || state === "confirm" ? (
-            <div className="space-y-4">
+          {state === "loading" ? (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 className="h-12 w-12 text-[var(--neon-cyan)] animate-spin" />
               <div className="text-sm text-[var(--text-secondary)]">
-                Choose what to delete:
+                Loading batch imports...
               </div>
-              
-              <div className="space-y-2">
-                <label className={cn(
-                  "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                  selectedOption === "last7"
-                    ? "border-[var(--neon-cyan)] bg-[var(--neon-cyan)]/10"
-                    : "border-[var(--line)] hover:border-[var(--neon-cyan)]/50"
-                )}>
-                  <input
-                    type="radio"
-                    name="deleteOption"
-                    value="last7"
-                    checked={selectedOption === "last7"}
-                    onChange={(e) => setSelectedOption(e.target.value as "last7")}
-                    className="accent-[var(--neon-cyan)]"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--text-primary)]">
-                      Last 7 days
+            </div>
+          ) : state === "idle" || state === "confirm" ? (
+            <div className="space-y-4">
+              {batches.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4 opacity-50" />
+                  <div className="text-sm text-[var(--text-secondary)]">
+                    No batch imports found
+                  </div>
+                  <div className="text-xs text-[var(--text-secondary)] mt-2">
+                    Only bulk-imported entries can be deleted here
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-[var(--text-secondary)]">
+                      Select batches to delete:
                     </div>
-                    <div className="text-xs text-[var(--text-secondary)]">
-                      Delete entries from the past week
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAll}
+                        className="text-xs text-[var(--neon-cyan)] hover:underline"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-xs text-[var(--text-secondary)]">|</span>
+                      <button
+                        onClick={deselectAll}
+                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+                      >
+                        Deselect All
+                      </button>
                     </div>
                   </div>
-                </label>
 
-                <label className={cn(
-                  "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                  selectedOption === "last30"
-                    ? "border-[var(--neon-cyan)] bg-[var(--neon-cyan)]/10"
-                    : "border-[var(--line)] hover:border-[var(--neon-cyan)]/50"
-                )}>
-                  <input
-                    type="radio"
-                    name="deleteOption"
-                    value="last30"
-                    checked={selectedOption === "last30"}
-                    onChange={(e) => setSelectedOption(e.target.value as "last30")}
-                    className="accent-[var(--neon-cyan)]"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--text-primary)]">
-                      Last 30 days
-                    </div>
-                    <div className="text-xs text-[var(--text-secondary)]">
-                      Delete entries from the past month
-                    </div>
+                  <div className="max-h-96 overflow-y-auto space-y-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 p-4">
+                    {batches.map((batch) => {
+                      const entryCount = batchCounts.get(batch.batchId) || batch.entryCount || 0;
+                      const isSelected = selectedBatches.has(batch.batchId);
+                      
+                      return (
+                        <label
+                          key={batch.id}
+                          className={cn(
+                            "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
+                            isSelected
+                              ? "border-[var(--neon-pink)] bg-[var(--neon-pink)]/10"
+                              : "border-[var(--line)] hover:border-[var(--neon-pink)]/50 hover:bg-[var(--bg-surface)]/60"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleBatch(batch.batchId)}
+                            className="accent-[var(--neon-pink)] w-4 h-4"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-[var(--neon-cyan)]" />
+                              <div className="text-sm font-semibold text-[var(--text-primary)]">
+                                Batch Import
+                              </div>
+                              <div className="text-xs text-[var(--text-secondary)] font-mono">
+                                {batch.batchId.slice(-8)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1">
+                              <div className="text-xs text-[var(--text-secondary)]">
+                                {format(batch.createdAt, "MMM d, yyyy 'at' h:mm a")}
+                              </div>
+                              <span className="text-xs text-[var(--text-secondary)]">•</span>
+                              <div className="text-xs font-semibold text-[var(--neon-cyan)]">
+                                {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
-                </label>
 
-                <label className={cn(
-                  "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                  selectedOption === "all"
-                    ? "border-[var(--neon-pink)] bg-[var(--neon-pink)]/10"
-                    : "border-[var(--line)] hover:border-[var(--neon-pink)]/50"
-                )}>
-                  <input
-                    type="radio"
-                    name="deleteOption"
-                    value="all"
-                    checked={selectedOption === "all"}
-                    onChange={(e) => setSelectedOption(e.target.value as "all")}
-                    className="accent-[var(--neon-pink)]"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--text-primary)]">
-                      All entries
-                    </div>
-                    <div className="text-xs text-[var(--neon-pink)]">
-                      Delete all timeline entries (irreversible!)
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              {state === "confirm" && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--neon-pink)]/10 px-4 py-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-[var(--neon-pink)] flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-[var(--text-primary)]">
-                      <div className="font-semibold mb-1">Are you sure?</div>
-                      <div className="text-[var(--text-secondary)]">
-                        This action cannot be undone. Entries will be moved to the archive before deletion.
+                  {selectedBatches.size > 0 && (
+                    <div className="rounded-2xl border border-[var(--neon-cyan)]/50 bg-[var(--neon-cyan)]/10 px-4 py-3">
+                      <div className="text-sm text-[var(--text-primary)]">
+                        <span className="font-semibold">{selectedBatches.size}</span> batch{selectedBatches.size === 1 ? '' : 'es'} selected
+                        <span className="text-[var(--text-secondary)]"> • </span>
+                        <span className="font-semibold text-[var(--neon-cyan)]">{totalSelectedEntries}</span> total entries will be deleted
                       </div>
                     </div>
-                  </div>
-                </motion.div>
+                  )}
+
+                  {state === "confirm" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--neon-pink)]/10 px-4 py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-[var(--neon-pink)] flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-[var(--text-primary)]">
+                          <div className="font-semibold mb-1">Are you sure?</div>
+                          <div className="text-[var(--text-secondary)]">
+                            This will delete {totalSelectedEntries} bulk-imported {totalSelectedEntries === 1 ? 'entry' : 'entries'}. 
+                            Entries will be archived for 30 days before permanent deletion.
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </>
               )}
             </div>
           ) : null}
@@ -204,7 +254,7 @@ export function BulkDeleteModal({
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="h-12 w-12 text-[var(--neon-pink)] animate-spin" />
               <div className="text-sm text-[var(--text-secondary)]">
-                Deleting entries...
+                Deleting batch entries...
               </div>
             </div>
           ) : null}
@@ -224,7 +274,7 @@ export function BulkDeleteModal({
                   Deletion Complete!
                 </div>
                 <div className="text-sm text-[var(--text-secondary)] mt-1">
-                  {deleteCount} {deleteCount === 1 ? 'entry' : 'entries'} removed from your timeline
+                  {deleteCount} {deleteCount === 1 ? 'entry' : 'entries'} removed and archived
                 </div>
               </div>
             </motion.div>
@@ -247,7 +297,7 @@ export function BulkDeleteModal({
         </div>
 
         {/* Footer */}
-        {(state === "idle" || state === "confirm") && (
+        {(state === "idle" || state === "confirm") && batches.length > 0 && (
           <div className="px-8 py-6 border-t border-[var(--line)] flex items-center justify-end gap-3">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -258,17 +308,20 @@ export function BulkDeleteModal({
               {state === "confirm" ? "Back" : "Cancel"}
             </motion.button>
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={selectedBatches.size > 0 ? { scale: 1.05 } : {}}
+              whileTap={selectedBatches.size > 0 ? { scale: 0.95 } : {}}
               onClick={handleDelete}
+              disabled={selectedBatches.size === 0}
               className={cn(
-                "px-6 py-2 rounded-xl text-sm font-semibold",
-                state === "confirm"
-                  ? "bg-[var(--neon-pink)] text-[var(--bg-deep)] shadow-[0_10px_40px_rgba(255,107,157,0.5)]"
-                  : "bg-gradient-to-r from-[var(--neon-pink)] to-[var(--neon-purple)] text-[var(--bg-deep)] shadow-[0_10px_40px_rgba(255,0,110,0.4)]"
+                "px-6 py-2 rounded-xl text-sm font-semibold transition-all",
+                selectedBatches.size > 0
+                  ? state === "confirm"
+                    ? "bg-[var(--neon-pink)] text-[var(--bg-deep)] shadow-[0_10px_40px_rgba(255,107,157,0.5)]"
+                    : "bg-gradient-to-r from-[var(--neon-pink)] to-[var(--neon-purple)] text-[var(--bg-deep)] shadow-[0_10px_40px_rgba(255,0,110,0.4)]"
+                  : "bg-[var(--bg-surface)] text-[var(--text-secondary)] opacity-50 cursor-not-allowed"
               )}
             >
-              {state === "confirm" ? "Confirm Delete" : "Delete"}
+              {state === "confirm" ? `Confirm Delete ${totalSelectedEntries} Entries` : `Delete Selected`}
             </motion.button>
           </div>
         )}
