@@ -25,8 +25,8 @@ export function analyzeMood(text: string): Mood {
   return 'neutral';
 }
 
-function getMoodDescription(rating: number, mood: Mood, score: number): string {
-  // More sophisticated mood descriptions based on rating and raw score
+function getMoodDescription(rating: number, mood: Mood): string {
+  // More sophisticated mood descriptions based on rating
   if (mood === 'positive') {
     if (rating >= 95) return 'ecstatic and overjoyed';
     if (rating >= 90) return 'absolutely thrilled';
@@ -96,7 +96,7 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
     emoji = rating >= 52 ? '😐' : rating >= 48 ? '🤔' : '😶';
   }
   
-  const description = getMoodDescription(rating, mood, score);
+  const description = getMoodDescription(rating, mood);
   
   return {
     mood,

@@ -48,7 +48,7 @@ function GlowingDot({
   const timeLabel = format(chat.createdAt, "h:mm a");
     
   return (
-    <div className="relative group">
+    <div className="relative group/dot">
       <motion.button
         type="button"
         onClick={onClick}
@@ -103,13 +103,10 @@ function GlowingDot({
         )}
       </motion.button>
       
-      {/* Date label that shows on hover */}
-      <motion.div
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap"
+      {/* Date label that shows on group hover */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
         style={{ top: yOffset < -100 ? 'calc(100% + 8px)' : '-32px' }}
-        initial={{ opacity: 0, y: 5 }}
-        whileHover={{ opacity: 1, y: 0 }}
-        animate={{ opacity: 0 }}
       >
         <div 
           className="text-[10px] font-mono font-semibold px-2 py-1 rounded-md"
@@ -123,21 +120,19 @@ function GlowingDot({
           <div>{dateLabel}</div>
           <div className="opacity-70">{timeLabel}</div>
         </div>
-      </motion.div>
+      </div>
       
-      {/* Show mood info on hover */}
+      {/* Show mood info on group hover */}
       {chat.moodAnalysis && (
-        <motion.div
-          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap"
+        <div
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
           style={{ top: yOffset < -100 ? '-60px' : 'calc(100% + 32px)' }}
-          initial={{ opacity: 0 }}
-          whileHover={{ opacity: 1 }}
         >
           <div className="text-lg">{chat.moodAnalysis.emoji}</div>
           <div className="text-[10px] font-mono text-[var(--text-secondary)]">
             {chat.moodAnalysis.rating}/100
           </div>
-        </motion.div>
+        </div>
       )}
     </div>
   );
