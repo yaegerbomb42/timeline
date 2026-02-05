@@ -20,7 +20,7 @@ function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
 }
 
-// Glowing dot with particle trail
+// Glowing dot with particle trail and date label
 function GlowingDot({
   chat,
   isNewest,
@@ -42,70 +42,117 @@ function GlowingDot({
        chat.moodAnalysis.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
        'rgba(0,245,255,0.6)')
     : 'rgba(0,245,255,0.6)';
+  
+  // Format date for display
+  const dateLabel = format(chat.createdAt, "MMM d");
+  const timeLabel = format(chat.createdAt, "h:mm a");
+  
+  // Label positioning constants
+  // Spacing values chosen for optimal visual separation and readability
+  const DOT_SIZE = 16; // Base size of the timeline dot (from dotPx calculation)
+  const LABEL_VERTICAL_SPACING = 32; // Space between dot edge and label (2x dot size for comfortable gap)
+  const LABEL_MARGIN = 8; // Small margin when label is placed below dot
+  const MOOD_LABEL_OFFSET = 60; // Extra space for mood emoji/rating label
+  
+  // When yOffset < -100 (dot is high on rollercoaster), place label below to avoid overlap with top edge
+  // Otherwise place label above the dot for better visibility
+  const LABEL_ABOVE_DOT = `-${LABEL_VERTICAL_SPACING}px`;
+  const LABEL_BELOW_DOT = `calc(100% + ${LABEL_MARGIN}px)`;
+  const MOOD_ABOVE_DOT = `-${MOOD_LABEL_OFFSET}px`;
+  const MOOD_BELOW_DOT = `calc(100% + ${LABEL_VERTICAL_SPACING}px)`;
+  const HIGH_POSITION_THRESHOLD = -100; // Y offset where we switch label position
     
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}` : ''}`}
-      initial={{ opacity: 0, scale: 0.3, y: 10 }}
-      animate={{
-        opacity: 1,
-        scale: isHighlighted ? [1, 1.3, 1] : 1,
-        y: yOffset,
-        boxShadow: isHighlighted
-          ? [
-              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
-              `0 0 0 15px ${moodColorRgba}`,
-              `0 0 0 8px ${moodColorRgba.replace('0.6', '0.4')}`,
-              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
-            ]
-          : isNewest
+    <div className="relative group/dot">
+      <motion.button
+        type="button"
+        onClick={onClick}
+        aria-label={`${format(chat.createdAt, "MMMM d, yyyy 'at' h:mm a")}${chat.moodAnalysis ? `, Mood: ${chat.moodAnalysis.description}, Rating: ${chat.moodAnalysis.rating} out of 100` : ''}`}
+        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}` : ''}`}
+        initial={{ opacity: 0, scale: 0.3, y: 10 }}
+        animate={{
+          opacity: 1,
+          scale: isHighlighted ? [1, 1.3, 1] : 1,
+          y: yOffset,
+          boxShadow: isHighlighted
+            ? [
+                `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
+                `0 0 0 15px ${moodColorRgba}`,
+                `0 0 0 8px ${moodColorRgba.replace('0.6', '0.4')}`,
+                `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
+              ]
+            : isNewest
+              ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
+              : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
+        }}
+        exit={{ opacity: 0, scale: 0.3, y: 10 }}
+        transition={{
+          duration: isHighlighted ? 1.5 : 0.4,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        whileHover={{ scale: 1.3, y: yOffset - 2 }}
+        whileTap={{ scale: 0.9 }}
+        className={cn(
+          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10",
+        )}
+        style={{
+          width: size,
+          height: size,
+          background: `radial-gradient(circle, ${moodColor}, ${moodColor}dd)`,
+          boxShadow: isNewest 
             ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
             : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
-      }}
-      exit={{ opacity: 0, scale: 0.3, y: 10 }}
-      transition={{
-        duration: isHighlighted ? 1.5 : 0.4,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      whileHover={{ scale: 1.3, y: yOffset - 2 }}
-      whileTap={{ scale: 0.9 }}
-      className={cn(
-        "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10",
-      )}
-      style={{
-        width: size,
-        height: size,
-        background: `radial-gradient(circle, ${moodColor}, ${moodColor}dd)`,
-        boxShadow: isNewest 
-          ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
-          : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
-      }}
-    >
-      {isNewest && (
-        <motion.div
-          className="absolute inset-0 rounded-full"
-          animate={{
-            scale: [1, 1.5, 1],
-            opacity: [0.6, 0, 0.6],
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
+        }}
+      >
+        {isNewest && (
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            animate={{
+              scale: [1, 1.5, 1],
+              opacity: [0.6, 0, 0.6],
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+            style={{
+              background: `radial-gradient(circle, ${moodColor}, transparent)`,
+            }}
+          />
+        )}
+      </motion.button>
+      
+      {/* Date label that shows on group hover - aria-hidden as info is in button's aria-label */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
+        style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? LABEL_BELOW_DOT : LABEL_ABOVE_DOT }}
+        aria-hidden="true"
+      >
+        <div 
+          className="text-[10px] font-mono font-semibold px-2 py-1 rounded-md"
           style={{
-            background: `radial-gradient(circle, ${moodColor}, transparent)`,
+            background: `${moodColor}22`,
+            border: `1px solid ${moodColor}66`,
+            color: moodColor,
+            textShadow: `0 0 8px ${moodColor}`,
           }}
-        />
-      )}
-      {/* Show mood emoji on hover */}
-      {chat.moodAnalysis && (
-        <motion.div
-          className="absolute -top-6 left-1/2 -translate-x-1/2 text-lg opacity-0 group-hover:opacity-100 pointer-events-none"
-          whileHover={{ opacity: 1 }}
         >
-          {chat.moodAnalysis.emoji}
-        </motion.div>
+          <div>{dateLabel}</div>
+          <div className="opacity-70">{timeLabel}</div>
+        </div>
+      </div>
+      
+      {/* Show mood info on group hover - aria-hidden as info is in button's aria-label */}
+      {chat.moodAnalysis && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
+          style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? MOOD_ABOVE_DOT : MOOD_BELOW_DOT }}
+          aria-hidden="true"
+        >
+          <div className="text-lg">{chat.moodAnalysis.emoji}</div>
+          <div className="text-[10px] font-mono text-[var(--text-secondary)]">
+            {chat.moodAnalysis.rating}/100
+          </div>
+        </div>
       )}
-    </motion.button>
+    </div>
   );
 }
 
@@ -234,24 +281,40 @@ export function TimelineBar({
                     const x = idx * slotWidth + slotWidth / 2;
                     return day.chats.map((chat) => {
                       // Calculate Y position based on mood rating (1-100)
-                      // Rating 1 (sad) -> bottom (y=250), Rating 100 (happy) -> top (y=50)
+                      // Canvas coordinates: lower Y = top of screen, higher Y = bottom of screen
+                      // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
+                      // This creates the "rollercoaster" effect with happy moments at peaks
                       const rating = chat.moodAnalysis?.rating ?? 50;
-                      const y = 250 - ((rating - 1) / 99) * 200;
+                      const y = 230 - ((rating - 1) / 99) * 200;
                       return { x, y };
                     });
                   });
                   
                   if (points.length < 2) return '';
                   
-                  // Create smooth curve through points
+                  // Create smooth cubic Bézier curve through points for flowing line
                   let path = `M ${points[0]!.x} ${points[0]!.y}`;
                   
                   for (let i = 1; i < points.length; i++) {
                     const prev = points[i - 1]!;
                     const curr = points[i]!;
-                    const cpx = (prev.x + curr.x) / 2;
-                    path += ` Q ${cpx} ${prev.y}, ${cpx} ${(prev.y + curr.y) / 2}`;
-                    path += ` Q ${cpx} ${curr.y}, ${curr.x} ${curr.y}`;
+                    
+                    // Calculate control points for smooth curve
+                    // Tension factor controls curve smoothness: 0.0 = sharp angles, 1.0 = very smooth
+                    // 0.4 chosen as optimal balance: smooth flow without overshooting or flattening
+                    const tension = 0.4;
+                    const dx = curr.x - prev.x;
+                    
+                    // Control point 1 (from previous point)
+                    const cp1x = prev.x + dx * tension;
+                    const cp1y = prev.y;
+                    
+                    // Control point 2 (to current point)
+                    const cp2x = curr.x - dx * tension;
+                    const cp2y = curr.y;
+                    
+                    // Cubic Bézier curve for smooth flow
+                    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
                   }
                   
                   return path;
@@ -262,10 +325,10 @@ export function TimelineBar({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 0.8 }}
+                animate={{ pathLength: 1, opacity: 0.9 }}
                 transition={{ duration: 2, ease: "easeInOut" }}
                 style={{
-                  filter: 'drop-shadow(0 0 10px var(--glow-cyan))',
+                  filter: 'drop-shadow(0 0 12px var(--glow-cyan))',
                 }}
               />
             )}
@@ -342,9 +405,11 @@ export function TimelineBar({
                     <AnimatePresence initial={false}>
                       {marks.map((c) => {
                         // Calculate Y offset based on mood rating (1-100)
+                        // Canvas coordinates: lower Y = top, higher Y = bottom
                         // Rating 1 (sad) -> bottom, Rating 100 (happy) -> top
+                        // Adjusted to match the path calculation for perfect alignment
                         const rating = c.moodAnalysis?.rating ?? 50;
-                        const yOffset = -50 - ((rating - 1) / 99) * 200;
+                        const yOffset = -30 - ((rating - 1) / 99) * 200;
                         
                         return (
                           <div

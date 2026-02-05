@@ -26,34 +26,36 @@ export function analyzeMood(text: string): Mood {
 }
 
 function getMoodDescription(rating: number, mood: Mood): string {
-  // Sophisticated mood descriptions based on rating
+  // More sophisticated mood descriptions based on rating
   if (mood === 'positive') {
-    if (rating >= 95) return 'euphoric';
-    if (rating >= 90) return 'found love';
-    if (rating >= 85) return 'absolutely thrilled';
-    if (rating >= 80) return 'feeling blessed';
-    if (rating >= 75) return 'genuinely happy';
-    if (rating >= 70) return 'grateful';
-    if (rating >= 65) return 'accomplished';
-    if (rating >= 60) return 'motivated';
-    if (rating >= 55) return 'content';
-    return 'peaceful';
+    if (rating >= 95) return 'ecstatic and overjoyed';
+    if (rating >= 90) return 'absolutely thrilled';
+    if (rating >= 85) return 'feeling blessed and grateful';
+    if (rating >= 80) return 'genuinely happy';
+    if (rating >= 75) return 'optimistic and hopeful';
+    if (rating >= 70) return 'content and satisfied';
+    if (rating >= 65) return 'pleasantly upbeat';
+    if (rating >= 60) return 'mildly positive';
+    if (rating >= 55) return 'slightly cheerful';
+    return 'calm and peaceful';
   } else if (mood === 'negative') {
-    if (rating <= 5) return 'completely devastated';
-    if (rating <= 10) return 'laid in bed all day';
-    if (rating <= 15) return 'deeply struggling';
-    if (rating <= 20) return 'overwhelmed';
+    if (rating <= 5) return 'devastated and heartbroken';
+    if (rating <= 10) return 'deeply depressed';
+    if (rating <= 15) return 'severely distressed';
+    if (rating <= 20) return 'overwhelmed with sadness';
     if (rating <= 25) return 'emotionally drained';
-    if (rating <= 30) return 'disappointed';
-    if (rating <= 35) return 'frustrated';
+    if (rating <= 30) return 'quite disappointed';
+    if (rating <= 35) return 'frustrated and irritated';
     if (rating <= 40) return 'stressed out';
-    if (rating <= 45) return 'mildly anxious';
-    return 'slightly off';
+    if (rating <= 45) return 'somewhat anxious';
+    return 'a bit down';
   } else {
-    // neutral
-    if (rating >= 55) return 'taking things in stride';
-    if (rating >= 50) return 'going through the motions';
-    return 'existing';
+    // neutral - more nuanced descriptions
+    if (rating >= 55) return 'balanced and steady';
+    if (rating >= 52) return 'reflective and thoughtful';
+    if (rating >= 50) return 'neutral and composed';
+    if (rating >= 48) return 'contemplative';
+    return 'quietly observant';
   }
 }
 
@@ -61,31 +63,45 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
   const result = sentiment.analyze(text);
   const score = result.score;
   
-  // Normalize score to 1-100 scale
-  // Sentiment scores typically range from -10 to +10 for normal text
-  // Map -10 to 1, 0 to 50, +10 to 100
-  const normalized = Math.max(-10, Math.min(10, score));
-  const rating = Math.round(((normalized + 10) / 20) * 99 + 1);
+  // Improved normalization with better distribution
+  // The sentiment library typically produces scores from -10 to +10 for normal text,
+  // but can go higher for very emotionally charged content. We clamp to -15/+15
+  // to handle extreme cases while maintaining good distribution across the 1-100 scale.
+  const clampedScore = Math.max(-15, Math.min(15, score));
+  
+  // More sophisticated mapping for better accuracy
+  // Use non-linear scaling to give more granularity in the middle ranges
+  let rating: number;
+  if (clampedScore >= 0) {
+    // Positive: map 0-15 to 50-100 with emphasis on higher scores
+    rating = 50 + (clampedScore / 15) * 50;
+  } else {
+    // Negative: map -15-0 to 1-50 with emphasis on lower scores  
+    rating = 50 + (clampedScore / 15) * 49;
+  }
+  
+  rating = Math.round(Math.max(1, Math.min(100, rating)));
   
   let mood: Mood;
   let emoji: string;
   
-  if (score > 3) {
+  // Adjusted thresholds for more accurate mood detection
+  if (score > 2) {
     mood = 'positive';
-    emoji = rating >= 90 ? '😄' : rating >= 75 ? '😊' : '🙂';
-  } else if (score < -3) {
+    emoji = rating >= 90 ? '😄' : rating >= 75 ? '😊' : rating >= 60 ? '🙂' : '😌';
+  } else if (score < -2) {
     mood = 'negative';
-    emoji = rating <= 10 ? '😢' : rating <= 25 ? '😔' : '😐';
+    emoji = rating <= 10 ? '😢' : rating <= 25 ? '😔' : rating <= 40 ? '😐' : '😕';
   } else {
     mood = 'neutral';
-    emoji = '😐';
+    emoji = rating >= 52 ? '😐' : rating >= 48 ? '🤔' : '😶';
   }
   
   const description = getMoodDescription(rating, mood);
   
   return {
     mood,
-    rating: Math.max(1, Math.min(100, rating)),
+    rating,
     description,
     emoji,
     score,

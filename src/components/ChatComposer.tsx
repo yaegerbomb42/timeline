@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { WordVacuum } from "@/components/WordVacuum";
 import { cn } from "@/lib/utils";
 
 // Ripple effect on send button
@@ -98,11 +97,9 @@ export function ChatComposer({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    // Use requestAnimationFrame to prevent jittering during paste
-    requestAnimationFrame(() => {
-      el.style.height = "0px";
-      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-    });
+    // Update height without animation to prevent jittering
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
 
   useEffect(() => {
@@ -204,18 +201,12 @@ export function ChatComposer({
           : "0 20px 60px rgba(0,0,0,0.5), 0 0 20px rgba(0,245,255,0.1) inset",
       }}
     >
-      {/* Animated background gradient */}
-      <motion.div
+      {/* Static background gradient - no animation */}
+      <div
         className="absolute inset-0 -z-10 opacity-20"
-        animate={{
-          background: [
-            "radial-gradient(circle at 0% 0%, var(--glow-cyan), transparent)",
-            "radial-gradient(circle at 100% 100%, var(--glow-purple), transparent)",
-            "radial-gradient(circle at 50% 50%, var(--glow-pink), transparent)",
-            "radial-gradient(circle at 0% 0%, var(--glow-cyan), transparent)",
-          ],
+        style={{
+          background: "radial-gradient(circle at 50% 50%, var(--glow-cyan), transparent)",
         }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
       />
 
       <div className="relative px-6 pt-6 pb-4 border-b border-[var(--line)]">
@@ -322,15 +313,6 @@ export function ChatComposer({
           >
             <Clipboard className="h-5 w-5" />
           </motion.button>
-          
-          {/* Word vacuum system */}
-          {isFocused && value.trim() ? (
-            <WordVacuum
-              value={value}
-              textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
-              isActive={isFocused}
-            />
-          ) : null}
         </div>
 
         {/* Image preview */}
