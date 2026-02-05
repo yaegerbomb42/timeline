@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth";
 import { AnimatePresence, motion, useScroll, useTransform, type MotionValue } from "framer-motion";
-import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2 } from "lucide-react";
+import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2, Archive } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -13,6 +13,7 @@ import { StatsBar } from "@/components/StatsBar";
 import { TimelineBar } from "@/components/TimelineBar";
 import { BatchImportModal } from "@/components/BatchImportModal";
 import { UndoBatchModal } from "@/components/UndoBatchModal";
+import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { addChat, deleteChat, useChats } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
@@ -76,6 +77,7 @@ function ParallaxHeader({
   isAdmin,
   onBatchImport,
   onUndoBatch,
+  onViewArchive,
 }: { 
   scrollY: MotionValue<number>; 
   user: User | null; 
@@ -84,6 +86,7 @@ function ParallaxHeader({
   isAdmin: boolean;
   onBatchImport: () => void;
   onUndoBatch: () => void;
+  onViewArchive: () => void;
 }) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
@@ -122,8 +125,8 @@ function ParallaxHeader({
         transition={{ delay: 0.3, duration: 0.6 }}
         className="flex items-center gap-3 flex-wrap justify-end"
       >
-        {/* Batch Import Button (admin only) */}
-        {!isGuest && user && (
+        {/* Admin-only buttons */}
+        {isAdmin && user && (
           <>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -152,6 +155,20 @@ function ParallaxHeader({
             >
               <Undo2 className="h-4 w-4" />
               Undo Batch
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onViewArchive}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
+                "font-sans text-sm text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(131,56,236,0.4)]",
+                "hover:border-[var(--neon-purple)]"
+              )}
+            >
+              <Archive className="h-4 w-4" />
+              Archive
             </motion.button>
           </>
         )}
@@ -254,6 +271,7 @@ export function AppShell() {
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [showUndoBatch, setShowUndoBatch] = useState(false);
   const [burst, setBurst] = useState<SparkBurst | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
   const [flight, setFlight] = useState<
     | null
     | {
@@ -352,6 +370,17 @@ export function AppShell() {
           />
         )}
       </AnimatePresence>
+
+      {/* Deleted Archive Modal */}
+      <AnimatePresence>
+        {showArchive && user?.uid && (
+          <DeletedArchiveModal
+            uid={user.uid}
+            isOpen={showArchive}
+            onClose={() => setShowArchive(false)}
+          />
+        )}
+      </AnimatePresence>
       
       <AnimatePresence>
         {flight ? (
@@ -416,6 +445,7 @@ export function AppShell() {
           isAdmin={isAdmin}
           onBatchImport={() => setShowBatchImport(true)}
           onUndoBatch={() => setShowUndoBatch(true)}
+          onViewArchive={() => setShowArchive(true)}
         />
 
         {/* Composer + stats with breathing effect - Hidden for guest mode */}
