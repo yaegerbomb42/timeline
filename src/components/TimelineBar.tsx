@@ -47,7 +47,7 @@ function GlowingDot({
     <motion.button
       type="button"
       onClick={onClick}
-      title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/10` : ''}`}
+      title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}` : ''}`}
       initial={{ opacity: 0, scale: 0.3, y: 10 }}
       animate={{
         opacity: 1,
@@ -233,10 +233,10 @@ export function TimelineBar({
                   const points = days.flatMap((day, idx) => {
                     const x = idx * slotWidth + slotWidth / 2;
                     return day.chats.map((chat) => {
-                      // Calculate Y position based on mood rating (1-10)
-                      // Rating 1 (sad) -> bottom (y=250), Rating 10 (happy) -> top (y=50)
-                      const rating = chat.moodAnalysis?.rating ?? 5.5;
-                      const y = 250 - ((rating - 1) / 9) * 200;
+                      // Calculate Y position based on mood rating (1-100)
+                      // Rating 1 (sad) -> bottom (y=250), Rating 100 (happy) -> top (y=50)
+                      const rating = chat.moodAnalysis?.rating ?? 50;
+                      const y = 250 - ((rating - 1) / 99) * 200;
                       return { x, y };
                     });
                   });
@@ -341,10 +341,10 @@ export function TimelineBar({
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full h-full">
                     <AnimatePresence initial={false}>
                       {marks.map((c) => {
-                        // Calculate Y offset based on mood rating (1-10)
-                        // Rating 1 (sad) -> bottom, Rating 10 (happy) -> top
-                        const rating = c.moodAnalysis?.rating ?? 5.5;
-                        const yOffset = -50 - ((rating - 1) / 9) * 200;
+                        // Calculate Y offset based on mood rating (1-100)
+                        // Rating 1 (sad) -> bottom, Rating 100 (happy) -> top
+                        const rating = c.moodAnalysis?.rating ?? 50;
+                        const yOffset = -50 - ((rating - 1) / 99) * 200;
                         
                         return (
                           <div
