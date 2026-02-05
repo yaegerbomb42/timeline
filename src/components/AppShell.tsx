@@ -448,55 +448,104 @@ export function AppShell() {
           onViewArchive={() => setShowArchive(true)}
         />
 
-        {/* Composer + stats with breathing effect - Hidden for guest mode */}
+        {/* Primary panels - Hidden for guest mode */}
         {!isGuest && (
           <motion.section
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
-            className="flex flex-col items-center gap-6 mb-12"
+            className="flex flex-col gap-6 mb-10"
           >
-            <motion.div
-              animate={{
-                scale: [1, 1.01, 1],
-              }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="w-full max-w-4xl"
-            >
-              <ChatComposer
-                disabled={sending}
-                onSendStart={(start) => {
-                  const startX = start.left + start.width / 2;
-                  const startY = start.top + start.height / 2;
-                  const target = timelineCardRef.current?.getBoundingClientRect();
-                  const endX = target ? target.right - 56 : startX;
-                  const endY = target ? target.top + target.height - 82 : startY - 120;
-                  const midX = (startX + endX) / 2 + 60;
-                  const midY = Math.min(startY, endY) - 130;
-                  setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
-                }}
-              onSend={async (text, imageFile) => {
-                if (!user?.uid) return;
-                setSending(true);
-                try {
-                  const id = await addChat(user.uid, text, imageFile);
-                  setHighlightChatId(id);
-                } finally {
-                  setSending(false);
-                }
-              }}
-              />
-            </motion.div>
-            {user && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:min-h-[calc(100vh-320px)]">
+              <div className="flex flex-col gap-6 min-h-0">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.01, 1],
+                  }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="min-h-[220px] flex-1"
+                >
+                  <ChatComposer
+                    disabled={sending}
+                    onSendStart={(start) => {
+                      const startX = start.left + start.width / 2;
+                      const startY = start.top + start.height / 2;
+                      const target = timelineCardRef.current?.getBoundingClientRect();
+                      const endX = target ? target.right - 56 : startX;
+                      const endY = target ? target.top + target.height - 82 : startY - 120;
+                      const midX = (startX + endX) / 2 + 60;
+                      const midY = Math.min(startY, endY) - 130;
+                      setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
+                    }}
+                    onSend={async (text, imageFile) => {
+                      if (!user?.uid) return;
+                      setSending(true);
+                      try {
+                        const id = await addChat(user.uid, text, imageFile);
+                        setHighlightChatId(id);
+                      } finally {
+                        setSending(false);
+                      }
+                    }}
+                  />
+                </motion.div>
+                {user && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45, duration: 0.6 }}
+                    className="min-h-[260px] flex-1 min-h-0"
+                  >
+                    <AiPanel uid={user.uid} chats={chats} />
+                  </motion.div>
+                )}
+              </div>
+              <motion.section
+                ref={timelineCardRef}
+                initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.6 }}
-                className="w-full max-w-5xl"
+                transition={{ delay: 0.6, duration: 0.8 }}
+                className="relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col min-h-[260px]"
+                style={{
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
+                }}
               >
-                <AiPanel uid={user.uid} chats={chats} />
-              </motion.div>
-            )}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10"
+                  animate={{
+                    opacity: [0.3, 0.5, 0.3],
+                  }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                />
+                <div className="relative px-6 pt-6 pb-4 border-b border-[var(--line)]">
+                  <div className="flex items-center gap-2 text-[var(--text-primary)]">
+                    <motion.div
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Sparkles className="h-5 w-5 text-[var(--neon-cyan)]" />
+                    </motion.div>
+                    <div className="font-sans text-base font-semibold">Your timeline</div>
+                  </div>
+                  <div className="mt-2 text-sm text-[var(--text-secondary)]">
+                    {groupedByDay.size === 0
+                      ? "No marks yet. Start writing to see your story unfold."
+                      : `${groupedByDay.size} day${groupedByDay.size === 1 ? "" : "s"} recorded.`}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <TimelineBar
+                    groupedByDay={groupedByDay}
+                    newestChatId={newestChatId}
+                    highlightChatId={highlightChatId}
+                    onSelectChat={(id) => {
+                      const el = document.getElementById(`chat-${id}`);
+                      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                  />
+                </div>
+              </motion.section>
+            </div>
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -507,54 +556,6 @@ export function AppShell() {
             </motion.div>
           </motion.section>
         )}
-      </div>
-
-      {/* Full-width timeline bar breaking out of container */}
-      <div className="mx-auto w-full relative z-10 mb-12">
-        {/* Timeline bar with 3D depth */}
-        <motion.section
-          ref={timelineCardRef}
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.8 }}
-          className="relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden mx-6"
-          style={{
-            boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
-          }}
-        >
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10"
-            animate={{
-              opacity: [0.3, 0.5, 0.3],
-            }}
-            transition={{ duration: 4, repeat: Infinity }}
-          />
-          <div className="relative px-6 pt-6 pb-4 border-b border-[var(--line)]">
-            <div className="flex items-center gap-2 text-[var(--text-primary)]">
-              <motion.div
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-              >
-                <Sparkles className="h-5 w-5 text-[var(--neon-cyan)]" />
-              </motion.div>
-              <div className="font-sans text-base font-semibold">Your timeline</div>
-            </div>
-            <div className="mt-2 text-sm text-[var(--text-secondary)]">
-              {groupedByDay.size === 0
-                ? "No marks yet. Start writing to see your story unfold."
-                : `${groupedByDay.size} day${groupedByDay.size === 1 ? "" : "s"} recorded.`}
-            </div>
-          </div>
-          <TimelineBar
-            groupedByDay={groupedByDay}
-            newestChatId={newestChatId}
-            highlightChatId={highlightChatId}
-            onSelectChat={(id) => {
-              const el = document.getElementById(`chat-${id}`);
-              el?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
-          />
-        </motion.section>
       </div>
 
       <div className="mx-auto w-full max-w-7xl relative z-10">

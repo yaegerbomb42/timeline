@@ -208,7 +208,9 @@ function TimelineEntry({
               <img
                 src={chat.imageUrl}
                 alt="Entry image"
-                className="w-full h-auto max-h-96 object-contain"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto max-h-[420px] object-contain bg-[var(--bg-deep)]/40"
               />
             </motion.div>
           )}

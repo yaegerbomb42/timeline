@@ -165,7 +165,7 @@ export function TimelineBar({
   }, [days]);
 
   return (
-    <div className="px-6 py-6">
+    <div className="flex h-full flex-col px-6 py-6">
       <div className="flex items-center justify-between gap-4 mb-6">
         <motion.div
           initial={{ opacity: 0, x: -10 }}
@@ -198,6 +198,7 @@ export function TimelineBar({
         ref={viewport.ref}
         className={cn(
           "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
+          "flex-1",
           "overflow-x-auto overscroll-x-contain",
           "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
           scrollable ? "pb-3" : "",
@@ -208,7 +209,7 @@ export function TimelineBar({
         }}
       >
         <div
-          className="relative h-[300px]"
+          className="relative min-h-[220px] h-full"
           style={{
             width: trackWidth,
             minWidth: "100%",

@@ -289,7 +289,9 @@ function EntryCard({
             <img
               src={chat.imageUrl}
               alt="Entry image"
-              className="w-full h-auto object-contain"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-auto max-h-[420px] object-contain bg-[var(--bg-deep)]/40"
             />
           </motion.div>
         )}
