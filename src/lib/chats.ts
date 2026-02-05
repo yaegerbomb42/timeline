@@ -11,6 +11,8 @@ import {
   runTransaction,
   serverTimestamp,
   deleteDoc,
+  getDocs,
+  getDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
@@ -140,7 +142,41 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
 }
 
 export async function deleteChat(uid: string, chatId: string) {
-  await deleteDoc(doc(db, "users", uid, "chats", chatId));
+  // First, get the chat data to archive it
+  const chatRef = doc(db, "users", uid, "chats", chatId);
+  const chatSnap = await getDoc(chatRef);
+  
+  if (chatSnap.exists()) {
+    const chatData = chatSnap.data();
+    
+    // Archive the deleted entry
+    try {
+      await addDoc(collection(db, "users", uid, "deleted_archive"), {
+        ...chatData,
+        originalId: chatId,
+        deletedAt: serverTimestamp(),
+      });
+      
+      // Clean up old archives (keep only last 30)
+      const archiveQuery = query(
+        collection(db, "users", uid, "deleted_archive"),
+        orderBy("deletedAt", "desc")
+      );
+      const archiveSnap = await getDocs(archiveQuery);
+      
+      // Delete entries beyond the 30th
+      const toDelete = archiveSnap.docs.slice(30);
+      for (const docToDelete of toDelete) {
+        await deleteDoc(docToDelete.ref);
+      }
+    } catch (err) {
+      // Non-fatal - continue with deletion even if archiving fails
+      console.error("Failed to archive deleted entry:", err);
+    }
+  }
+  
+  // Delete the original chat
+  await deleteDoc(chatRef);
 }
 
 export function useChats(uid?: string) {
@@ -237,7 +273,7 @@ export function parseBatchImport(text: string): BatchImportEntry[] {
 }
 
 /**
- * Add multiple entries from a batch import with rate limiting for AI analysis
+ * Add multiple entries from a batch import with dynamic rate limiting for AI analysis
  */
 export async function addBatchChats(
   uid: string,
@@ -246,6 +282,10 @@ export async function addBatchChats(
 ): Promise<{ batchId: string; chatIds: string[] }> {
   const batchId = `batch_${Date.now()}`;
   const chatIds: string[] = [];
+
+  // Dynamic rate limiting: start fast, slow down if needed
+  let delayMs = 50; // Start with 50ms
+  let consecutiveSuccesses = 0;
 
   // Process entries with rate limiting (delay between AI calls)
   for (let i = 0; i < entries.length; i++) {
@@ -257,9 +297,24 @@ export async function addBatchChats(
     const monthKey = dayKey.slice(0, 7);
     const excerpt = makeExcerpt(entry.content);
     
-    // Analyze mood with small delay to avoid rate limiting
-    const mood = analyzeMood(entry.content);
-    const moodAnalysis = analyzeMoodDetailed(entry.content);
+    // Analyze mood with dynamic delay to avoid rate limiting
+    let mood, moodAnalysis;
+    try {
+      mood = analyzeMood(entry.content);
+      moodAnalysis = analyzeMoodDetailed(entry.content);
+      consecutiveSuccesses++;
+      
+      // Speed up if we have multiple successes (down to minimum 25ms)
+      if (consecutiveSuccesses >= 3 && delayMs > 25) {
+        delayMs = Math.max(25, delayMs - 10);
+      }
+    } catch (err) {
+      // If AI analysis fails, use defaults and slow down
+      mood = "neutral";
+      moodAnalysis = { score: 0, comparative: 0, positive: [], negative: [] };
+      consecutiveSuccesses = 0;
+      delayMs = Math.min(200, delayMs + 50); // Slow down on errors
+    }
     
     // Create the document
     const docData: Record<string, unknown> = {
@@ -323,9 +378,9 @@ export async function addBatchChats(
     // Report progress
     onProgress?.(i + 1, entries.length);
 
-    // Rate limiting: small delay between entries to avoid overwhelming AI services
+    // Dynamic rate limiting: delay between entries adjusts based on success/failure
     if (i < entries.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
 
@@ -434,6 +489,51 @@ export function useBatches(uid?: string) {
   }, [uid]);
 
   return batches;
+}
+
+/**
+ * Hook to get deleted chat archives (last 30)
+ */
+export function useDeletedArchive(uid?: string) {
+  const [deletedChats, setDeletedChats] = useState<Chat[]>([]);
+
+  useEffect(() => {
+    if (!uid) return;
+
+    const q = query(
+      collection(db, "users", uid, "deleted_archive"),
+      orderBy("deletedAt", "desc")
+    );
+
+    return onSnapshot(q, (snap) => {
+      const items: Chat[] = snap.docs.map((d) => {
+        const data = d.data({ serverTimestamps: "estimate" }) as any;
+        const createdAt: Date =
+          data.createdAt?.toDate?.() ??
+          (data.createdAtLocal ? new Date(data.createdAtLocal) : new Date());
+        const dayKey: string = data.dayKey ?? format(createdAt, "yyyy-MM-dd");
+        const text = String(data.text ?? "");
+        const mood = data.mood ?? (text ? analyzeMood(text) : undefined);
+        const moodAnalysis = data.moodAnalysis ?? (text ? analyzeMoodDetailed(text) : undefined);
+        
+        return {
+          id: d.id,
+          text,
+          excerpt: String(data.excerpt ?? makeExcerpt(text)),
+          createdAt,
+          createdAtMs: createdAt.getTime(),
+          dayKey,
+          mood,
+          moodAnalysis,
+          imageUrl: data.imageUrl,
+          batchId: data.batchId,
+        };
+      });
+      setDeletedChats(items);
+    });
+  }, [uid]);
+
+  return deletedChats;
 }
 
 
