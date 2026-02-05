@@ -47,7 +47,7 @@ function GlowingDot({
     <motion.button
       type="button"
       onClick={onClick}
-      title={`${format(chat.createdAt, "PPP p")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/10` : ''}`}
+      title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/10` : ''}`}
       initial={{ opacity: 0, scale: 0.3, y: 10 }}
       animate={{
         opacity: 1,
@@ -143,7 +143,8 @@ export function TimelineBar({
     const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
     const canScroll = width > 0 ? track > width + 1 : false;
-    const stride = Math.max(1, Math.ceil(100 / slot));
+    // Adjust stride to show more labels when there's enough space
+    const stride = slot >= 40 ? Math.max(1, Math.ceil(60 / slot)) : Math.max(1, Math.ceil(100 / slot));
     return { slotWidth: slot, trackWidth: track, scrollable: canScroll, labelStride: stride };
   }, [viewport.width, days.length]);
 
@@ -311,12 +312,14 @@ export function TimelineBar({
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="absolute left-1/2 -translate-x-1/2 top-2 text-[11px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap"
+                      className="absolute left-1/2 -translate-x-1/2 top-2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md"
                       style={{
                         textShadow: "0 0 10px var(--glow-cyan)",
+                        background: "rgba(0, 245, 255, 0.1)",
+                        border: "1px solid rgba(0, 245, 255, 0.3)",
                       }}
                     >
-                      {format(day.date, "LLL")}
+                      {format(day.date, "LLL yyyy")}
                     </motion.div>
                   ) : null}
 
@@ -370,7 +373,7 @@ export function TimelineBar({
                       transition={{ delay: idx * 0.05 + 0.2 }}
                       className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[11px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
                     >
-                      {format(day.date, "d")}
+                      {slotWidth >= 40 ? format(day.date, "MMM d") : format(day.date, "d")}
                     </motion.div>
                   ) : null}
                 </motion.div>
