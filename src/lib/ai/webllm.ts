@@ -2,14 +2,14 @@
 
 import { CreateMLCEngine, MLCEngine } from "@mlc-ai/web-llm";
 
-// Qwen3-0.6B is a good balance between size and capability
-const MODEL_NAME = "Qwen3-0.6B-q4f16_1-MLC";
+// Qwen2.5-1.5B provides a stronger local baseline while remaining lightweight
+const MODEL_NAME = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
 
 let engine: MLCEngine | null = null;
 let initPromise: Promise<MLCEngine> | null = null;
 
 /**
- * Initialize the WebLLM engine with Qwen3-0.6B model
+ * Initialize the WebLLM engine with Qwen2.5-1.5B model
  * This runs entirely in the browser using WebGPU
  */
 export async function initWebLLM(onProgress?: (progress: { text: string; progress: number }) => void): Promise<MLCEngine> {
@@ -56,20 +56,16 @@ export async function generateWithWebLLM(
 ): Promise<string> {
   const llm = await initWebLLM(onProgress);
 
-  const prompt = `You are a helpful AI assistant analyzing a personal timeline. Use the provided context to answer the user's question accurately and concisely.
-
-TIMELINE CONTEXT:
-${context}
-
-USER QUESTION: ${query}
-
-ANSWER:`;
-
   const response = await llm.chat.completions.create({
     messages: [
       {
+        role: "system",
+        content:
+          "You are a helpful AI assistant analyzing a personal timeline. Use only the provided context to answer accurately and concisely. If the answer is missing from context, say so.",
+      },
+      {
         role: "user",
-        content: prompt,
+        content: `TIMELINE CONTEXT:\n${context}\n\nUSER QUESTION: ${query}\n\nANSWER:`,
       },
     ],
     temperature: 0.7,
