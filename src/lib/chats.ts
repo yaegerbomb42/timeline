@@ -67,17 +67,24 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
     }
   }
   
-  const docRef = await addDoc(collection(db, "users", uid, "chats"), {
+  // Build the document data, only including imageUrl if it's defined
+  const docData: Record<string, unknown> = {
     text,
     excerpt,
     dayKey,
     mood,
     moodAnalysis,
-    imageUrl,
     createdAtLocal: now.toISOString(),
     createdAt: serverTimestamp(),
     v: 1,
-  });
+  };
+  
+  // Only add imageUrl if it's defined (Firebase doesn't allow undefined values)
+  if (imageUrl !== undefined) {
+    docData.imageUrl = imageUrl;
+  }
+  
+  const docRef = await addDoc(collection(db, "users", uid, "chats"), docData);
 
   // Lightweight, persistent condensation for AI: per-month index with a few samples.
   // Not critical for core app flow—fail silently.
@@ -151,15 +158,21 @@ export function useChats(uid?: string) {
             data.createdAt?.toDate?.() ??
             (data.createdAtLocal ? new Date(data.createdAtLocal) : new Date());
           const dayKey: string = data.dayKey ?? format(createdAt, "yyyy-MM-dd");
+          const text = String(data.text ?? "");
+          
+          // Calculate mood and moodAnalysis for prior chats that don't have it
+          const mood = data.mood ?? (text ? analyzeMood(text) : undefined);
+          const moodAnalysis = data.moodAnalysis ?? (text ? analyzeMoodDetailed(text) : undefined);
+          
           return {
             id: d.id,
-            text: String(data.text ?? ""),
-            excerpt: String(data.excerpt ?? makeExcerpt(String(data.text ?? ""))),
+            text,
+            excerpt: String(data.excerpt ?? makeExcerpt(text)),
             createdAt,
             createdAtMs: createdAt.getTime(),
             dayKey,
-            mood: data.mood,
-            moodAnalysis: data.moodAnalysis,
+            mood,
+            moodAnalysis,
             imageUrl: data.imageUrl,
           };
         });
