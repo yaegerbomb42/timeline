@@ -192,7 +192,7 @@ export function AiPanel({
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/70 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden"
+      className="rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/70 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden h-full flex flex-col"
       style={{
         boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
       }}
@@ -229,7 +229,7 @@ export function AiPanel({
         </div>
       </div>
 
-      <div className="px-6 py-6">
+      <div className="px-6 py-6 flex-1 min-h-0">
         {!hydrated || loading ? (
           <motion.div
             animate={{ opacity: [0.5, 1, 0.5] }}
@@ -371,7 +371,7 @@ export function AiPanel({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col h-[520px]"
+            className="flex flex-col h-full min-h-[360px]"
           >
             {/* Mode Selection and Settings */}
             <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-[var(--line)]">
