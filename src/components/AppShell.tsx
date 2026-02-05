@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth";
 import { AnimatePresence, motion, useScroll, useTransform, type MotionValue } from "framer-motion";
-import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2, Archive } from "lucide-react";
+import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2, Archive, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -14,6 +14,7 @@ import { TimelineBar } from "@/components/TimelineBar";
 import { BatchImportModal } from "@/components/BatchImportModal";
 import { UndoBatchModal } from "@/components/UndoBatchModal";
 import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
+import { BulkDeleteModal } from "@/components/BulkDeleteModal";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { addChat, deleteChat, useChats } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
@@ -78,6 +79,7 @@ function ParallaxHeader({
   onBatchImport,
   onUndoBatch,
   onViewArchive,
+  onBulkDelete,
 }: { 
   scrollY: MotionValue<number>; 
   user: User | null; 
@@ -87,6 +89,7 @@ function ParallaxHeader({
   onBatchImport: () => void;
   onUndoBatch: () => void;
   onViewArchive: () => void;
+  onBulkDelete: () => void;
 }) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
@@ -145,12 +148,26 @@ function ParallaxHeader({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={onUndoBatch}
+              onClick={onBulkDelete}
               className={cn(
                 "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
                 "font-sans text-sm text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
                 "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(255,0,110,0.4)]",
                 "hover:border-[var(--neon-pink)]"
+              )}
+            >
+              <Trash2 className="h-4 w-4" />
+              Bulk Delete
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onUndoBatch}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
+                "font-sans text-sm text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(131,56,236,0.4)]",
+                "hover:border-[var(--neon-purple)]"
               )}
             >
               <Undo2 className="h-4 w-4" />
@@ -270,6 +287,7 @@ export function AppShell() {
   const [highlightChatId, setHighlightChatId] = useState<string | null>(null);
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [showUndoBatch, setShowUndoBatch] = useState(false);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [burst, setBurst] = useState<SparkBurst | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [flight, setFlight] = useState<
@@ -371,6 +389,16 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
+      {/* Bulk Delete Modal */}
+      <AnimatePresence>
+        {showBulkDelete && user?.uid && (
+          <BulkDeleteModal
+            uid={user.uid}
+            onClose={() => setShowBulkDelete(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Deleted Archive Modal */}
       <AnimatePresence>
         {showArchive && user?.uid && (
@@ -446,6 +474,7 @@ export function AppShell() {
           onBatchImport={() => setShowBatchImport(true)}
           onUndoBatch={() => setShowUndoBatch(true)}
           onViewArchive={() => setShowArchive(true)}
+          onBulkDelete={() => setShowBulkDelete(true)}
         />
 
         {/* Primary panels - Hidden for guest mode */}
@@ -456,96 +485,99 @@ export function AppShell() {
             transition={{ delay: 0.4, duration: 0.8 }}
             className="flex flex-col gap-6 mb-10"
           >
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:min-h-[calc(100vh-320px)]">
-              <div className="flex flex-col gap-6 min-h-0">
-                <motion.div
-                  animate={{
-                    scale: [1, 1.01, 1],
-                  }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="min-h-[220px] flex-1"
-                >
-                  <ChatComposer
-                    disabled={sending}
-                    onSendStart={(start) => {
-                      const startX = start.left + start.width / 2;
-                      const startY = start.top + start.height / 2;
-                      const target = timelineCardRef.current?.getBoundingClientRect();
-                      const endX = target ? target.right - 56 : startX;
-                      const endY = target ? target.top + target.height - 82 : startY - 120;
-                      const midX = (startX + endX) / 2 + 60;
-                      const midY = Math.min(startY, endY) - 130;
-                      setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
-                    }}
-                    onSend={async (text, imageFile) => {
-                      if (!user?.uid) return;
-                      setSending(true);
-                      try {
-                        const id = await addChat(user.uid, text, imageFile);
-                        setHighlightChatId(id);
-                      } finally {
-                        setSending(false);
-                      }
-                    }}
-                  />
-                </motion.div>
-                {user && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.45, duration: 0.6 }}
-                    className="min-h-[260px] flex-1 min-h-0"
-                  >
-                    <AiPanel uid={user.uid} chats={chats} />
-                  </motion.div>
-                )}
-              </div>
-              <motion.section
-                ref={timelineCardRef}
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.8 }}
-                className="relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col min-h-[260px]"
-                style={{
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
+            {/* Top: Entry composer */}
+            <motion.div
+              animate={{
+                scale: [1, 1.01, 1],
+              }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="w-full"
+            >
+              <ChatComposer
+                disabled={sending}
+                onSendStart={(start) => {
+                  const startX = start.left + start.width / 2;
+                  const startY = start.top + start.height / 2;
+                  const target = timelineCardRef.current?.getBoundingClientRect();
+                  const endX = target ? target.right - 56 : startX;
+                  const endY = target ? target.top + target.height - 82 : startY + 400;
+                  const midX = (startX + endX) / 2 + 60;
+                  const midY = Math.min(startY, endY) + 130;
+                  setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
                 }}
+                onSend={async (text, imageFile) => {
+                  if (!user?.uid) return;
+                  setSending(true);
+                  try {
+                    const id = await addChat(user.uid, text, imageFile);
+                    setHighlightChatId(id);
+                  } finally {
+                    setSending(false);
+                  }
+                }}
+              />
+            </motion.div>
+
+            {/* Middle: AI Panel */}
+            {user && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.6 }}
+                className="w-full"
               >
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10"
-                  animate={{
-                    opacity: [0.3, 0.5, 0.3],
+                <AiPanel uid={user.uid} chats={chats} />
+              </motion.div>
+            )}
+
+            {/* Bottom: Timeline Rollercoaster */}
+            <motion.section
+              ref={timelineCardRef}
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col min-h-[320px]"
+              style={{
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(131,56,236,0.2) inset",
+              }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10"
+                animate={{
+                  opacity: [0.3, 0.5, 0.3],
+                }}
+                transition={{ duration: 4, repeat: Infinity }}
+              />
+              <div className="relative px-6 pt-6 pb-4 border-b border-[var(--line)]">
+                <div className="flex items-center gap-2 text-[var(--text-primary)]">
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Sparkles className="h-5 w-5 text-[var(--neon-cyan)]" />
+                  </motion.div>
+                  <div className="font-sans text-base font-semibold">Timeline Rollercoaster</div>
+                </div>
+                <div className="mt-2 text-sm text-[var(--text-secondary)]">
+                  {groupedByDay.size === 0
+                    ? "No marks yet. Start writing to see your story unfold."
+                    : `${groupedByDay.size} day${groupedByDay.size === 1 ? "" : "s"} recorded.`}
+                </div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <TimelineBar
+                  groupedByDay={groupedByDay}
+                  newestChatId={newestChatId}
+                  highlightChatId={highlightChatId}
+                  onSelectChat={(id) => {
+                    const el = document.getElementById(`chat-${id}`);
+                    el?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
-                  transition={{ duration: 4, repeat: Infinity }}
                 />
-                <div className="relative px-6 pt-6 pb-4 border-b border-[var(--line)]">
-                  <div className="flex items-center gap-2 text-[var(--text-primary)]">
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                    >
-                      <Sparkles className="h-5 w-5 text-[var(--neon-cyan)]" />
-                    </motion.div>
-                    <div className="font-sans text-base font-semibold">Your timeline</div>
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--text-secondary)]">
-                    {groupedByDay.size === 0
-                      ? "No marks yet. Start writing to see your story unfold."
-                      : `${groupedByDay.size} day${groupedByDay.size === 1 ? "" : "s"} recorded.`}
-                  </div>
-                </div>
-                <div className="flex-1 min-h-0">
-                  <TimelineBar
-                    groupedByDay={groupedByDay}
-                    newestChatId={newestChatId}
-                    highlightChatId={highlightChatId}
-                    onSelectChat={(id) => {
-                      const el = document.getElementById(`chat-${id}`);
-                      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }}
-                  />
-                </div>
-              </motion.section>
-            </div>
+              </div>
+            </motion.section>
+
+            {/* Stats bar */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
