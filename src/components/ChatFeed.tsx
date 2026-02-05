@@ -9,20 +9,19 @@ import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";
 
 const WORD_DELAY = 28;
-const CHAR_DELAY = 20;
 
 // Enhanced particle burst with neon colors
 function ParticleBurst({ x, y, count = 20 }: { x: number; y: number; count?: number }) {
-  const particles = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => ({
+  const [particles] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
       id: i,
       angle: (i / count) * Math.PI * 2,
       distance: 35 + Math.random() * 25,
       duration: 0.8 + Math.random() * 0.4,
       delay: Math.random() * 0.2,
       color: i % 3 === 0 ? "var(--neon-cyan)" : i % 3 === 1 ? "var(--neon-purple)" : "var(--neon-pink)",
-    }));
-  }, [count]);
+    }))
+  );
 
   return (
     <div
@@ -56,7 +55,7 @@ function ParticleBurst({ x, y, count = 20 }: { x: number; y: number; count?: num
 }
 
 // Word-by-word reveal with neon glow
-function WordReveal({ text, delay = 0, onComplete }: { text: string; delay?: number; onComplete?: () => void }) {
+function WordReveal({ text, onComplete }: { text: string; onComplete?: () => void }) {
   const words = useMemo(() => text.split(/(\s+)/).filter((w) => w.trim() || w === " "), [text]);
   const [revealed, setRevealed] = useState(0);
   const completedRef = useRef(false);
@@ -230,19 +229,36 @@ function EntryCard({
             </motion.div>
             <span className="font-semibold">{format(chat.createdAt, "PPP p")}</span>
           </motion.div>
-          {onDelete ? (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.04 + 0.1, duration: 0.4 }}
-              whileHover={{ scale: 1.15, rotate: 15 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleDeleteClick}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl p-2 text-[var(--text-secondary)] hover:text-[var(--neon-pink)] hover:bg-[var(--bg-surface)]/50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </motion.button>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {/* Mood indicator */}
+            {chat.moodAnalysis && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04 + 0.05, duration: 0.4 }}
+                className="inline-flex items-center gap-2 rounded-xl px-3 py-1 border border-[var(--line)] bg-[var(--bg-surface)]/50"
+                title={`Mood: ${chat.moodAnalysis.mood}`}
+              >
+                <span className="text-lg">{chat.moodAnalysis.emoji}</span>
+                <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">
+                  {chat.moodAnalysis.rating}/10
+                </span>
+              </motion.div>
+            )}
+            {onDelete ? (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04 + 0.1, duration: 0.4 }}
+                whileHover={{ scale: 1.15, rotate: 15 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleDeleteClick}
+                className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl p-2 text-[var(--text-secondary)] hover:text-[var(--neon-pink)] hover:bg-[var(--bg-surface)]/50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </motion.button>
+            ) : null}
+          </div>
         </div>
 
         {/* Content with word reveal */}

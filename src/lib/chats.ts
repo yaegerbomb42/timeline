@@ -16,7 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
 
 import { db, storage } from "@/lib/firebase/client";
-import { analyzeMood, type Mood } from "@/lib/sentiment";
+import { analyzeMood, analyzeMoodDetailed, type Mood, type MoodAnalysis } from "@/lib/sentiment";
 
 export type Chat = {
   id: string;
@@ -26,6 +26,7 @@ export type Chat = {
   createdAtMs: number;
   dayKey: string; // yyyy-MM-dd (local)
   mood?: Mood;
+  moodAnalysis?: MoodAnalysis;
   imageUrl?: string;
 };
 
@@ -49,14 +50,21 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   const monthKey = dayKey.slice(0, 7);
   const excerpt = makeExcerpt(text);
   const mood = analyzeMood(text);
+  const moodAnalysis = analyzeMoodDetailed(text);
   
   // Upload image to Firebase Storage if provided
   let imageUrl: string | undefined = undefined;
   if (imageFile) {
-    const imagePath = `users/${uid}/images/${now.getTime()}_${imageFile.name}`;
-    const storageRef = ref(storage, imagePath);
-    await uploadBytes(storageRef, imageFile);
-    imageUrl = await getDownloadURL(storageRef);
+    try {
+      const imagePath = `users/${uid}/images/${now.getTime()}_${imageFile.name}`;
+      const storageRef = ref(storage, imagePath);
+      await uploadBytes(storageRef, imageFile);
+      imageUrl = await getDownloadURL(storageRef);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      // Continue without image if upload fails
+      throw new Error('Image upload failed. Please try again.');
+    }
   }
   
   const docRef = await addDoc(collection(db, "users", uid, "chats"), {
@@ -64,6 +72,7 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
     excerpt,
     dayKey,
     mood,
+    moodAnalysis,
     imageUrl,
     createdAtLocal: now.toISOString(),
     createdAt: serverTimestamp(),
@@ -150,6 +159,7 @@ export function useChats(uid?: string) {
             createdAtMs: createdAt.getTime(),
             dayKey,
             mood: data.mood,
+            moodAnalysis: data.moodAnalysis,
             imageUrl: data.imageUrl,
           };
         });
