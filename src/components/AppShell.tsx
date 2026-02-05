@@ -75,21 +75,11 @@ function ParallaxHeader({
   user, 
   signOut, 
   isGuest, 
-  isAdmin,
-  onBatchImport,
-  onUndoBatch,
-  onViewArchive,
-  onBulkDelete,
 }: { 
   scrollY: MotionValue<number>; 
   user: User | null; 
   signOut: () => void;
   isGuest: boolean;
-  isAdmin: boolean;
-  onBatchImport: () => void;
-  onUndoBatch: () => void;
-  onViewArchive: () => void;
-  onBulkDelete: () => void;
 }) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
@@ -128,68 +118,6 @@ function ParallaxHeader({
         transition={{ delay: 0.3, duration: 0.6 }}
         className="flex items-center gap-3 flex-wrap justify-end"
       >
-        {/* Admin-only buttons */}
-        {isAdmin && user && (
-          <>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onBatchImport}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
-                "font-sans text-sm text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(0,245,255,0.4)]",
-                "hover:border-[var(--neon-cyan)]"
-              )}
-            >
-              <Upload className="h-4 w-4" />
-              Batch Import
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onBulkDelete}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
-                "font-sans text-sm text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(255,0,110,0.4)]",
-                "hover:border-[var(--neon-pink)]"
-              )}
-            >
-              <Trash2 className="h-4 w-4" />
-              Bulk Delete
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onUndoBatch}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
-                "font-sans text-sm text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(131,56,236,0.4)]",
-                "hover:border-[var(--neon-purple)]"
-              )}
-            >
-              <Undo2 className="h-4 w-4" />
-              Undo Batch
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onViewArchive}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
-                "font-sans text-sm text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(131,56,236,0.4)]",
-                "hover:border-[var(--neon-purple)]"
-              )}
-            >
-              <Archive className="h-4 w-4" />
-              Archive
-            </motion.button>
-          </>
-        )}
-
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="hidden sm:flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
@@ -220,6 +148,88 @@ function ParallaxHeader({
         </motion.button>
       </motion.div>
     </motion.header>
+  );
+}
+
+// Admin panel in top-left corner
+function AdminPanel({
+  onBatchImport,
+  onBulkDelete,
+  onUndoBatch,
+  onViewArchive,
+}: {
+  onBatchImport: () => void;
+  onBulkDelete: () => void;
+  onUndoBatch: () => void;
+  onViewArchive: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20, y: -20 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.6 }}
+      className="fixed top-6 left-6 z-40 flex flex-col gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl p-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+      style={{
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.1) inset",
+      }}
+    >
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onBatchImport}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+          "hover:border-[var(--neon-cyan)]"
+        )}
+      >
+        <Upload className="h-3.5 w-3.5" />
+        Batch Import
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onBulkDelete}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(255,0,110,0.4)]",
+          "hover:border-[var(--neon-pink)]"
+        )}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Bulk Delete
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onUndoBatch}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
+          "hover:border-[var(--neon-purple)]"
+        )}
+      >
+        <Undo2 className="h-3.5 w-3.5" />
+        Undo Batch
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onViewArchive}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
+          "hover:border-[var(--neon-purple)]"
+        )}
+      >
+        <Archive className="h-3.5 w-3.5" />
+        Archive
+      </motion.button>
+    </motion.div>
   );
 }
 
@@ -286,6 +296,7 @@ export function AppShell() {
   const newestChatId = chats[0]?.id;
   const [highlightChatId, setHighlightChatId] = useState<string | null>(null);
   const [showBatchImport, setShowBatchImport] = useState(false);
+  const [batchImportFile, setBatchImportFile] = useState<File | undefined>(undefined);
   const [showUndoBatch, setShowUndoBatch] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [burst, setBurst] = useState<SparkBurst | null>(null);
@@ -374,7 +385,11 @@ export function AppShell() {
         {showBatchImport && user?.uid && (
           <BatchImportModal
             uid={user.uid}
-            onClose={() => setShowBatchImport(false)}
+            onClose={() => {
+              setShowBatchImport(false);
+              setBatchImportFile(undefined);
+            }}
+            preloadedFile={batchImportFile}
           />
         )}
       </AnimatePresence>
@@ -464,17 +479,22 @@ export function AppShell() {
         ) : null}
       </AnimatePresence>
 
+      {/* Admin Panel - Top Left */}
+      {isAdmin && user && (
+        <AdminPanel
+          onBatchImport={() => setShowBatchImport(true)}
+          onBulkDelete={() => setShowBulkDelete(true)}
+          onUndoBatch={() => setShowUndoBatch(true)}
+          onViewArchive={() => setShowArchive(true)}
+        />
+      )}
+
       <div className="mx-auto w-full max-w-7xl relative z-10">
         <ParallaxHeader 
           scrollY={scrollY} 
           user={user} 
           signOut={signOut} 
           isGuest={isGuest}
-          isAdmin={isAdmin}
-          onBatchImport={() => setShowBatchImport(true)}
-          onUndoBatch={() => setShowUndoBatch(true)}
-          onViewArchive={() => setShowArchive(true)}
-          onBulkDelete={() => setShowBulkDelete(true)}
         />
 
         {/* Primary panels - Hidden for guest mode */}
@@ -514,6 +534,10 @@ export function AppShell() {
                   } finally {
                     setSending(false);
                   }
+                }}
+                onBatchImport={(file) => {
+                  setBatchImportFile(file);
+                  setShowBatchImport(true);
                 }}
               />
             </motion.div>

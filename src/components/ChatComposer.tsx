@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard } from "lucide-react";
+import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -74,10 +74,12 @@ export function ChatComposer({
   disabled,
   onSend,
   onSendStart,
+  onBatchImport,
 }: {
   disabled?: boolean;
   onSend: (text: string, imageFile?: File) => Promise<void> | void;
   onSendStart?: (start: DOMRect) => void;
+  onBatchImport?: (file?: File) => void;
 }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,6 +90,7 @@ export function ChatComposer({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -185,18 +188,49 @@ export function ChatComposer({
     }
   }
 
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (file.name.endsWith('.txt')) {
+      onBatchImport?.(file);
+    }
+  }
+
   return (
     <motion.div
       ref={composerRef}
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={cn(
-        "relative rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/70 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden",
+        "relative rounded-3xl border-[var(--line)] bg-[var(--bg-elevated)]/70 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden",
+        isDragging ? "border-2 border-[var(--neon-cyan)]" : "border",
         isFocused && "ring-2 ring-[var(--neon-cyan)]/50 ring-offset-2 ring-offset-[var(--bg-deep)]",
       )}
       style={{
-        boxShadow: isFocused
+        boxShadow: isDragging
+          ? "0 20px 60px rgba(0,0,0,0.5), 0 0 60px rgba(0,245,255,0.5) inset"
+          : isFocused
           ? "0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(0,245,255,0.3) inset"
           : "0 20px 60px rgba(0,0,0,0.5), 0 0 20px rgba(0,245,255,0.1) inset",
       }}
@@ -378,6 +412,28 @@ export function ChatComposer({
                 className="hidden"
               />
             </motion.label>
+
+            {/* Batch Import button */}
+            {onBatchImport && (
+              <motion.button
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onBatchImport()}
+                disabled={disabled || busy}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-2xl px-4 py-2",
+                  "border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+                  "text-[var(--text-secondary)] hover:text-[var(--neon-cyan)] transition-all",
+                  "disabled:opacity-60 disabled:cursor-not-allowed",
+                )}
+                style={{
+                  boxShadow: "0 0 10px rgba(0,0,0,0.2)",
+                }}
+              >
+                <Upload className="h-4 w-4" />
+                <span className="text-sm font-sans">Batch Import</span>
+              </motion.button>
+            )}
           </div>
 
           <div className="relative">
