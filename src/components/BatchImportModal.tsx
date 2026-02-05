@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Upload, X, FileText, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { parseBatchImport, addBatchChats, type BatchImportEntry } from "@/lib/chats";
 import { cn } from "@/lib/utils";
 
@@ -11,9 +11,11 @@ type ImportState = "idle" | "parsing" | "uploading" | "success" | "error";
 export function BatchImportModal({
   uid,
   onClose,
+  preloadedFile,
 }: {
   uid: string;
   onClose: () => void;
+  preloadedFile?: File;
 }) {
   const [state, setState] = useState<ImportState>("idle");
   const [entries, setEntries] = useState<BatchImportEntry[]>([]);
@@ -43,6 +45,14 @@ export function BatchImportModal({
       setState("error");
     }
   }
+
+  // Process preloaded file on mount
+  useEffect(() => {
+    if (preloadedFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void processFile(preloadedFile);
+    }
+  }, [preloadedFile]);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
