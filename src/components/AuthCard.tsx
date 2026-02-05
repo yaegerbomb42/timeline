@@ -8,15 +8,18 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { cn } from "@/lib/utils";
 
 export function AuthCard() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, signInAsGuest, signInAsAdmin } = useAuth();
+  const [mode, setMode] = useState<"signin" | "signup" | "admin">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const title = useMemo(
-    () => (mode === "signin" ? "Welcome back" : "Begin your journey"),
+    () => {
+      if (mode === "admin") return "Admin Access";
+      return mode === "signin" ? "Welcome back" : "Begin your journey";
+    },
     [mode],
   );
 
@@ -25,8 +28,13 @@ export function AuthCard() {
     setError(null);
     setBusy(true);
     try {
-      if (mode === "signin") await signInWithEmail(email.trim(), password);
-      else await signUpWithEmail(email.trim(), password);
+      if (mode === "admin") {
+        await signInAsAdmin(password);
+      } else if (mode === "signin") {
+        await signInWithEmail(email.trim(), password);
+      } else {
+        await signUpWithEmail(email.trim(), password);
+      }
     } catch (err: any) {
       setError(err?.message ?? "Authentication failed.");
     } finally {
@@ -183,28 +191,31 @@ export function AuthCard() {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-4">
-              <label className="block">
-                <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
-                  <Mail className="h-4 w-4 text-[var(--neon-purple)]" /> Email
-                </span>
-                <motion.input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@domain.com"
-                  whileFocus={{ scale: 1.02 }}
-                  className="w-full rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3.5 font-sans text-sm text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all"
-                  style={{
-                    boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-                  }}
-                  required
-                />
-              </label>
+              {mode !== "admin" && (
+                <label className="block">
+                  <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
+                    <Mail className="h-4 w-4 text-[var(--neon-purple)]" /> Email
+                  </span>
+                  <motion.input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@domain.com"
+                    whileFocus={{ scale: 1.02 }}
+                    className="w-full rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3.5 font-sans text-sm text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-cyan)] transition-all"
+                    style={{
+                      boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+                    }}
+                    required
+                  />
+                </label>
+              )}
 
               <label className="block">
                 <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
-                  <KeyRound className="h-4 w-4 text-[var(--neon-pink)]" /> Password
+                  <KeyRound className="h-4 w-4 text-[var(--neon-pink)]" /> 
+                  {mode === "admin" ? "Admin Password" : "Password"}
                 </span>
                 <motion.input
                   value={password}
@@ -243,12 +254,12 @@ export function AuthCard() {
                     >
                       <Zap className="h-4 w-4" />
                     </motion.div>
-                    {mode === "signin" ? "Signing in…" : "Creating account…"}
+                    {mode === "admin" ? "Signing in…" : mode === "signin" ? "Signing in…" : "Creating account…"}
                   </>
                 ) : (
                   <>
                     <Lock className="h-4 w-4" />
-                    {mode === "signin" ? "Sign in" : "Create account"}
+                    {mode === "admin" ? "Admin Sign in" : mode === "signin" ? "Sign in" : "Create account"}
                   </>
                 )}
               </motion.button>
@@ -270,18 +281,64 @@ export function AuthCard() {
               </AnimatePresence>
             </form>
 
-            <div className="mt-6 flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans">
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setMode((m) => (m === "signin" ? "signup" : "signin"))}
-                className="underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
-              >
-                {mode === "signin" ? "Create an account" : "I already have an account"}
-              </motion.button>
+            <div className="mt-6 flex items-center justify-between text-xs text-[var(--text-secondary)] font-sans gap-2">
+              {mode !== "admin" ? (
+                <>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setMode((m) => (m === "signin" ? "signup" : "signin"))}
+                    className="underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
+                  >
+                    {mode === "signin" ? "Create an account" : "I already have an account"}
+                  </motion.button>
+                </>
+              ) : (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setMode("signin")}
+                  className="underline underline-offset-4 hover:text-[var(--neon-cyan)] transition-colors"
+                >
+                  Back to sign in
+                </motion.button>
+              )}
               <span className="opacity-70 text-[10px]">Your entries are private</span>
             </div>
+
+            {/* Guest and Admin access buttons */}
+            {mode === "signin" && (
+              <div className="mt-4 pt-4 border-t border-[var(--line)] space-y-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    signInAsGuest();
+                  }}
+                  className={cn(
+                    "w-full rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+                    "px-5 py-2.5 font-sans text-xs text-[var(--text-secondary)] font-medium",
+                    "hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/80 transition-all duration-300"
+                  )}
+                >
+                  Continue as Guest (View Only)
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setMode("admin")}
+                  className={cn(
+                    "w-full rounded-2xl border border-[var(--neon-purple)]/50 bg-[var(--neon-purple)]/10",
+                    "px-5 py-2.5 font-sans text-xs text-[var(--neon-purple)] font-medium",
+                    "hover:bg-[var(--neon-purple)]/20 transition-all duration-300"
+                  )}
+                >
+                  Admin Access
+                </motion.button>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

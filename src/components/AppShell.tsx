@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth";
 import { AnimatePresence, motion, useScroll, useTransform, type MotionValue } from "framer-motion";
-import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap } from "lucide-react";
+import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -11,6 +11,8 @@ import { ChatComposer } from "@/components/ChatComposer";
 import { TimelineLog } from "@/components/TimelineLog";
 import { StatsBar } from "@/components/StatsBar";
 import { TimelineBar } from "@/components/TimelineBar";
+import { BatchImportModal } from "@/components/BatchImportModal";
+import { UndoBatchModal } from "@/components/UndoBatchModal";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { addChat, deleteChat, useChats } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
@@ -66,7 +68,23 @@ function FloatingParticles() {
 }
 
 // Parallax header with depth
-function ParallaxHeader({ scrollY, user, signOut }: { scrollY: MotionValue<number>; user: User | null; signOut: () => void }) {
+function ParallaxHeader({ 
+  scrollY, 
+  user, 
+  signOut, 
+  isGuest, 
+  isAdmin,
+  onBatchImport,
+  onUndoBatch,
+}: { 
+  scrollY: MotionValue<number>; 
+  user: User | null; 
+  signOut: () => void;
+  isGuest: boolean;
+  isAdmin: boolean;
+  onBatchImport: () => void;
+  onUndoBatch: () => void;
+}) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
   const headerScale = useTransform(scrollY, [0, 200], [1, 0.95]);
@@ -102,8 +120,42 @@ function ParallaxHeader({ scrollY, user, signOut }: { scrollY: MotionValue<numbe
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
-        className="flex items-center gap-3"
+        className="flex items-center gap-3 flex-wrap justify-end"
       >
+        {/* Batch Import Button (admin only) */}
+        {!isGuest && user && (
+          <>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onBatchImport}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
+                "font-sans text-sm text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(0,245,255,0.4)]",
+                "hover:border-[var(--neon-cyan)]"
+              )}
+            >
+              <Upload className="h-4 w-4" />
+              Batch Import
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onUndoBatch}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5",
+                "font-sans text-sm text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(255,0,110,0.4)]",
+                "hover:border-[var(--neon-pink)]"
+              )}
+            >
+              <Undo2 className="h-4 w-4" />
+              Undo Batch
+            </motion.button>
+          </>
+        )}
+
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="hidden sm:flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
@@ -115,7 +167,7 @@ function ParallaxHeader({ scrollY, user, signOut }: { scrollY: MotionValue<numbe
             <UserCircle2 className="h-5 w-5 text-[var(--neon-cyan)]" />
           </motion.div>
           <div className="font-sans text-sm text-[var(--text-primary)] font-medium">
-            {user?.email ?? user?.displayName ?? "Signed in"}
+            {isGuest ? "Guest (View Only)" : user?.email ?? user?.displayName ?? "Signed in"}
           </div>
         </motion.div>
         <motion.button
@@ -138,12 +190,14 @@ function ParallaxHeader({ scrollY, user, signOut }: { scrollY: MotionValue<numbe
 }
 
 export function AppShell() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, isGuest, isAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");
   const newestChatId = chats[0]?.id;
   const [highlightChatId, setHighlightChatId] = useState<string | null>(null);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [showUndoBatch, setShowUndoBatch] = useState(false);
   const [flight, setFlight] = useState<
     | null
     | {
@@ -211,11 +265,31 @@ export function AppShell() {
     );
   }
 
-  if (!user) return <AuthCard />;
+  if (!user && !isGuest) return <AuthCard />;
 
   return (
     <div className="min-h-screen px-6 py-10 relative overflow-hidden">
       <FloatingParticles />
+      
+      {/* Batch Import Modal */}
+      <AnimatePresence>
+        {showBatchImport && user?.uid && (
+          <BatchImportModal
+            uid={user.uid}
+            onClose={() => setShowBatchImport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Undo Batch Modal */}
+      <AnimatePresence>
+        {showUndoBatch && user?.uid && (
+          <UndoBatchModal
+            uid={user.uid}
+            onClose={() => setShowUndoBatch(false)}
+          />
+        )}
+      </AnimatePresence>
       
       <AnimatePresence>
         {flight ? (
@@ -246,34 +320,43 @@ export function AppShell() {
       </AnimatePresence>
 
       <div className="mx-auto w-full max-w-7xl relative z-10">
-        <ParallaxHeader scrollY={scrollY} user={user} signOut={signOut} />
+        <ParallaxHeader 
+          scrollY={scrollY} 
+          user={user} 
+          signOut={signOut} 
+          isGuest={isGuest}
+          isAdmin={isAdmin}
+          onBatchImport={() => setShowBatchImport(true)}
+          onUndoBatch={() => setShowUndoBatch(true)}
+        />
 
-        {/* Composer + stats with breathing effect */}
-        <motion.section
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.8 }}
-          className="flex flex-col items-center gap-6 mb-12"
-        >
-          <motion.div
-            animate={{
-              scale: [1, 1.01, 1],
-            }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="w-full max-w-4xl"
+        {/* Composer + stats with breathing effect - Hidden for guest mode */}
+        {!isGuest && (
+          <motion.section
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="flex flex-col items-center gap-6 mb-12"
           >
-            <ChatComposer
-              disabled={sending}
-              onSendStart={(start) => {
-                const startX = start.left + start.width / 2;
-                const startY = start.top + start.height / 2;
-                const target = timelineCardRef.current?.getBoundingClientRect();
-                const endX = target ? target.right - 56 : startX;
-                const endY = target ? target.top + target.height - 82 : startY - 120;
-                const midX = (startX + endX) / 2 + 60;
-                const midY = Math.min(startY, endY) - 130;
-                setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
+            <motion.div
+              animate={{
+                scale: [1, 1.01, 1],
               }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="w-full max-w-4xl"
+            >
+              <ChatComposer
+                disabled={sending}
+                onSendStart={(start) => {
+                  const startX = start.left + start.width / 2;
+                  const startY = start.top + start.height / 2;
+                  const target = timelineCardRef.current?.getBoundingClientRect();
+                  const endX = target ? target.right - 56 : startX;
+                  const endY = target ? target.top + target.height - 82 : startY - 120;
+                  const midX = (startX + endX) / 2 + 60;
+                  const midY = Math.min(startY, endY) - 130;
+                  setFlight({ id: Date.now(), startX, startY, midX, midY, endX, endY });
+                }}
               onSend={async (text, imageFile) => {
                 if (!user?.uid) return;
                 setSending(true);
@@ -284,17 +367,18 @@ export function AppShell() {
                   setSending(false);
                 }
               }}
-            />
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.6 }}
-            className="w-full"
-          >
-            <StatsBar stats={statsSnapshot} />
-          </motion.div>
-        </motion.section>
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              className="w-full"
+            >
+              <StatsBar stats={statsSnapshot} />
+            </motion.div>
+          </motion.section>
+        )}
       </div>
 
       {/* Full-width timeline bar breaking out of container */}
@@ -364,7 +448,7 @@ export function AppShell() {
               loading={chatsLoading}
               error={error}
               highlightChatId={highlightChatId}
-              onDelete={async (id) => {
+              onDelete={isGuest ? undefined : async (id) => {
                 if (!user?.uid) return;
                 await deleteChat(user.uid, id);
               }}
@@ -403,7 +487,7 @@ export function AppShell() {
               }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
             >
-              <AiPanel uid={user.uid} chats={chats} />
+              {user && <AiPanel uid={user.uid} chats={chats} />}
             </motion.div>
           </div>
         </motion.div>
