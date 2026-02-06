@@ -170,12 +170,13 @@ Respond ONLY with the JSON array, no other text.`;
     }));
 
     return NextResponse.json({ results });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Mood Analysis Error]:", error);
     
-    const errorMessage = error?.message || String(error);
+    const err = error as { message?: string; code?: string | number; status?: number };
+    const errorMessage = err?.message || String(error);
     
-    if (error?.code === 429 || errorMessage?.includes("quota") || errorMessage?.includes("rate limit")) {
+    if (err?.code === 429 || errorMessage?.includes("quota") || errorMessage?.includes("rate limit")) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again later." },
         { status: 429 }

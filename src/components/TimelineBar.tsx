@@ -44,13 +44,11 @@ function GlowingDot({
     : 'rgba(0,245,255,0.6)';
   
   // Format date for display
-  const dateLabel = format(chat.createdAt, "MMM d");
   const timeLabel = format(chat.createdAt, "h:mm a");
   const fullDate = format(chat.createdAt, "MMM d, yyyy");
   
   // Label positioning constants - IMPROVED SPACING
   // Spacing values optimized for better visual separation and readability with large datasets
-  const DOT_SIZE = 18; // Slightly larger base size for better visibility
   const LABEL_VERTICAL_SPACING = 48; // Increased from 38 to 48 for more breathing room
   const LABEL_MARGIN = 12; // Increased from 10 to 12 for better separation
   const MOOD_LABEL_OFFSET = 80; // Increased from 68 to 80 for clearer separation
@@ -194,7 +192,7 @@ export function TimelineBar({
   highlightChatId?: string | null;
   onSelectChat?: (chatId: string) => void;
 }) {
-  const viewport = useElementSize<HTMLDivElement>();
+  const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
 
   const days = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -209,7 +207,7 @@ export function TimelineBar({
   }, [groupedByDay]);
 
   const { slotWidth, trackWidth, scrollable, labelStride } = useMemo(() => {
-    const width = viewport.width || 0;
+    const width = viewportWidth || 0;
     const count = days.length || 1;
     
     // Optimized spacing for large datasets (1600+ entries)
@@ -235,15 +233,15 @@ export function TimelineBar({
     }
     
     return { slotWidth: slot, trackWidth: track, scrollable: canScroll, labelStride: stride };
-  }, [viewport.width, days.length]);
+  }, [viewportWidth, days.length]);
 
   // Auto-scroll to the newest side when the line overflows.
   useEffect(() => {
     if (!scrollable) return;
-    const el = viewport.ref.current;
+    const el = viewportRef.current;
     if (!el) return;
     el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
-  }, [scrollable, newestChatId, viewport.ref]);
+  }, [scrollable, newestChatId, viewportRef]);
 
   const rangeLabel = useMemo(() => {
     if (days.length === 0) return "No entries yet";
@@ -284,7 +282,7 @@ export function TimelineBar({
       </div>
 
       <div
-        ref={viewport.ref}
+        ref={viewportRef}
         className={cn(
           "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
           "flex-1",

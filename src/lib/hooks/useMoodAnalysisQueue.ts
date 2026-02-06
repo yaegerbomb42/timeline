@@ -54,11 +54,18 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
           }
         });
         
-        setStatus((prev) => ({ 
-          ...prev, 
-          pending: pendingCount,
-          total: pendingCount + prev.processed,
-        }));
+        // Use callback form to avoid cascading renders
+        setStatus((prev) => {
+          // Only update if values actually changed
+          if (prev.pending !== pendingCount || prev.total !== pendingCount + prev.processed) {
+            return { 
+              ...prev, 
+              pending: pendingCount,
+              total: pendingCount + prev.processed,
+            };
+          }
+          return prev;
+        });
       }
     );
 
