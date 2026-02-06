@@ -7,14 +7,14 @@
    - Sign in with Google or Email/Password
 
 2. **Enable Admin Mode:**
-   - On the login page, look for "Admin Access" button at the bottom
+   - After signing in, look for the "Admin Access" button in the header (top-right, next to "Sign out")
    - Click "Admin Access"
    - Enter the admin password: `Zawe1234!`
-   - Click "Admin Sign in"
+   - Click "Sign In"
 
 3. **Admin Features Available:**
 
-   Once in admin mode, you'll see additional buttons in the header:
+   Once in admin mode, you'll see an admin panel in the top-left corner with these buttons:
    
    - **Batch Import** (Cyan button with Upload icon)
      - Upload timeline entries from a .txt file
