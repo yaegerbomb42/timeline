@@ -10,6 +10,7 @@ export type MoodAnalysis = {
   description: string; // Sophisticated mood description
   emoji: string;
   score: number; // raw sentiment score
+  rationale: string; // Detailed explanation of the rating
 };
 
 export function analyzeMood(text: string): Mood {
@@ -59,9 +60,66 @@ function getMoodDescription(rating: number, mood: Mood): string {
   }
 }
 
+function generateRationale(rating: number, mood: Mood, score: number, positiveCount: number, negativeCount: number): string {
+  // Generate detailed rationale explaining the rating
+  const intensity = Math.abs(score);
+  let rationale = '';
+  
+  if (mood === 'positive') {
+    rationale = `Positive sentiment detected with ${positiveCount} positive word${positiveCount !== 1 ? 's' : ''}`;
+    if (negativeCount > 0) {
+      rationale += ` and ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}`;
+    }
+    rationale += `. `;
+    
+    if (rating >= 90) {
+      rationale += `Strong positive language and enthusiastic tone indicate exceptionally high mood.`;
+    } else if (rating >= 75) {
+      rationale += `Clear positive indicators show a notably uplifted emotional state.`;
+    } else if (rating >= 60) {
+      rationale += `Moderately positive expressions suggest an optimistic outlook.`;
+    } else {
+      rationale += `Subtle positive undertones suggest a calm, peaceful state.`;
+    }
+  } else if (mood === 'negative') {
+    rationale = `Negative sentiment detected with ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}`;
+    if (positiveCount > 0) {
+      rationale += ` and ${positiveCount} positive word${positiveCount !== 1 ? 's' : ''}`;
+    }
+    rationale += `. `;
+    
+    if (rating <= 10) {
+      rationale += `Intense negative language indicates severe emotional distress.`;
+    } else if (rating <= 25) {
+      rationale += `Strong negative expressions show significant emotional burden.`;
+    } else if (rating <= 40) {
+      rationale += `Moderate negative sentiment suggests stress or disappointment.`;
+    } else {
+      rationale += `Mild negative undertones indicate slight discomfort or concern.`;
+    }
+  } else {
+    rationale = `Balanced sentiment with ${positiveCount} positive and ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}. `;
+    
+    if (rating >= 52) {
+      rationale += `Neutral language with slightly positive lean suggests steady emotional state.`;
+    } else if (rating >= 48) {
+      rationale += `Neutral tone indicates a reflective or contemplative mood.`;
+    } else {
+      rationale += `Balanced expression suggests calm observation without strong emotion.`;
+    }
+  }
+  
+  // Add score context
+  rationale += ` (Sentiment score: ${score > 0 ? '+' : ''}${score.toFixed(1)})`;
+  
+  return rationale;
+}
+
 export function analyzeMoodDetailed(text: string): MoodAnalysis {
   const result = sentiment.analyze(text);
   const score = result.score;
+  const positiveCount = result.positive?.length ?? 0;
+  const negativeCount = result.negative?.length ?? 0;
   
   // Improved normalization with better distribution
   // The sentiment library typically produces scores from -10 to +10 for normal text,
@@ -98,6 +156,7 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
   }
   
   const description = getMoodDescription(rating, mood);
+  const rationale = generateRationale(rating, mood, score, positiveCount, negativeCount);
   
   return {
     mood,
@@ -105,6 +164,7 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
     description,
     emoji,
     score,
+    rationale,
   };
 }
 

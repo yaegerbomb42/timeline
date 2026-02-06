@@ -161,7 +161,7 @@ function TimelineEntry({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05 + 0.25 }}
                 className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border border-[var(--line)] bg-[var(--bg-surface)]/50"
-                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}`}
+                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
               >
                 <span className="text-base">{chat.moodAnalysis.emoji}</span>
                 <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">

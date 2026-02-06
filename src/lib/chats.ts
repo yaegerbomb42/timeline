@@ -628,8 +628,8 @@ export async function recalculateMoodRatings(uid: string, onProgress?: (current:
     const docSnap = snapshot.docs[i]!;
     const data = docSnap.data();
     
-    // Only update if mood analysis is missing
-    if (!data.moodAnalysis && data.text) {
+    // Update if mood analysis is missing OR if rationale field is missing
+    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.rationale)) {
       const text = String(data.text);
       const mood = analyzeMood(text);
       const moodAnalysis = analyzeMoodDetailed(text);

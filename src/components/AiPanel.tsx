@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud, ArrowLeft } from "lucide-react";
 import { useMemo, useState, useRef, useEffect } from "react";
 
-import { buildTimelineContext } from "@/lib/ai/context";
+import { buildTimelineContext, buildFilteredSummary } from "@/lib/ai/context";
 import type { MonthIndex } from "@/lib/ai/monthIndex";
 import { useMonthIndex } from "@/lib/ai/monthIndex";
 import { useAiKey } from "@/lib/ai/useAiKey";
@@ -128,7 +128,25 @@ export function AiPanel({
     setWebllmProgress(null);
     
     try {
-      const context = buildTimelineContext({ months: monthIndex, chats });
+      let context = buildTimelineContext({ months: monthIndex, chats });
+      
+      // Detect filtered queries and add specific data
+      const lowerQ = q.toLowerCase();
+      if (lowerQ.includes("above 80") || lowerQ.includes("> 80") || lowerQ.includes("high mood") || lowerQ.includes("best days")) {
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating >= 80));
+        context += "\n\nFILTERED ENTRIES (mood >= 80):\n" + filteredSummary;
+      } else if (lowerQ.includes("below 40") || lowerQ.includes("< 40") || lowerQ.includes("low mood") || lowerQ.includes("worst days")) {
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating < 40));
+        context += "\n\nFILTERED ENTRIES (mood < 40):\n" + filteredSummary;
+      } else if (lowerQ.match(/above (\d+)/)) {
+        const threshold = parseInt(lowerQ.match(/above (\d+)/)?.[1] ?? "0", 10);
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating >= threshold));
+        context += `\n\nFILTERED ENTRIES (mood >= ${threshold}):\n` + filteredSummary;
+      } else if (lowerQ.match(/below (\d+)/)) {
+        const threshold = parseInt(lowerQ.match(/below (\d+)/)?.[1] ?? "0", 10);
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating < threshold));
+        context += `\n\nFILTERED ENTRIES (mood < ${threshold}):\n` + filteredSummary;
+      }
       
       if (effectiveMode === "local") {
         // Use WebLLM local model
@@ -532,6 +550,66 @@ export function AiPanel({
 
             {/* Input Bar at Bottom */}
             <div className="px-6 py-4 border-t border-[var(--line)]">
+              {/* Quick Question Buttons */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What made my mood better on days above 80?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-cyan)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  💯 High mood days
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What were the main themes in my entries this month?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-purple)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📅 Monthly themes
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What patterns do you see in my mood over time?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-pink)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📈 Mood patterns
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("Summarize my recent week")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-cyan)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📝 Week summary
+                </motion.button>
+              </div>
+              
               <div className="flex gap-3">
                 <motion.input
                   value={query}
