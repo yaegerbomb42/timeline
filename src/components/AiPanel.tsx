@@ -532,6 +532,66 @@ export function AiPanel({
 
             {/* Input Bar at Bottom */}
             <div className="px-6 py-4 border-t border-[var(--line)]">
+              {/* Quick Question Buttons */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What made my mood better on days above 80?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-cyan)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  💯 High mood days
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What were the main themes in my entries this month?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-purple)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📅 Monthly themes
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("What patterns do you see in my mood over time?")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-pink)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📈 Mood patterns
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setQuery("Summarize my recent week")}
+                  disabled={busy}
+                  className={cn(
+                    "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
+                    "text-[var(--text-secondary)} hover:text-[var(--text-primary)]",
+                    "hover:border-[var(--neon-cyan)] transition-colors",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  📝 Week summary
+                </motion.button>
+              </div>
+              
               <div className="flex gap-3">
                 <motion.input
                   value={query}

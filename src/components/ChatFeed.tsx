@@ -237,7 +237,7 @@ function EntryCard({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.04 + 0.05, duration: 0.4 }}
                 className="inline-flex items-center gap-2 rounded-xl px-3 py-1 border border-[var(--line)] bg-[var(--bg-surface)]/50"
-                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}`}
+                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
               >
                 <span className="text-lg">{chat.moodAnalysis.emoji}</span>
                 <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">

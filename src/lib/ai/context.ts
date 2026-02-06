@@ -9,6 +9,31 @@ function clampText(s: string, maxChars: number) {
   return t.slice(0, Math.max(0, maxChars - 1)).trimEnd() + "…";
 }
 
+/**
+ * Build a summary of entries matching a filter
+ * Used for targeted queries like "days above 80"
+ */
+export function buildFilteredSummary(chats: Chat[], filterFn: (chat: Chat) => boolean): string {
+  const filtered = chats.filter(filterFn);
+  
+  if (filtered.length === 0) {
+    return "No entries match the filter criteria.";
+  }
+  
+  const sortedByDate = [...filtered].sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const summary = sortedByDate
+    .slice(0, 50) // Limit to 50 entries to avoid context overflow
+    .map((c, i) => {
+      const when = format(c.createdAt, "PPP");
+      const body = clampText(c.text, 300);
+      const mood = c.moodAnalysis ? ` [Mood: ${c.moodAnalysis.rating}/100 ${c.moodAnalysis.emoji}]` : '';
+      return `${i + 1}. [${when}]${mood} ${body}`;
+    })
+    .join("\n");
+  
+  return `Found ${filtered.length} matching entries. Showing ${Math.min(50, filtered.length)} most recent:\n${summary}`;
+}
+
 export function buildTimelineContext({
   months,
   chats,
@@ -25,6 +50,14 @@ export function buildTimelineContext({
   const newestDayKey = ordered[0]?.dayKey;
   const range =
     oldest && newest ? `${format(oldest, "PPP")} → ${format(newest, "PPP")}` : "No entries yet";
+
+  // Calculate mood statistics
+  const moodStats = {
+    high: ordered.filter(c => c.moodAnalysis && c.moodAnalysis.rating >= 80).length,
+    good: ordered.filter(c => c.moodAnalysis && c.moodAnalysis.rating >= 60 && c.moodAnalysis.rating < 80).length,
+    neutral: ordered.filter(c => c.moodAnalysis && c.moodAnalysis.rating >= 40 && c.moodAnalysis.rating < 60).length,
+    low: ordered.filter(c => c.moodAnalysis && c.moodAnalysis.rating < 40).length,
+  };
 
   const recent = ordered.slice(0, 30);
   const recentDaySummary = (() => {
@@ -66,7 +99,8 @@ export function buildTimelineContext({
     .map((c, i) => {
       const when = format(c.createdAt, "PPP p");
       const body = clampText(c.text, 700);
-      return `${i + 1}. [${when}] ${body}`;
+      const mood = c.moodAnalysis ? ` [Mood: ${c.moodAnalysis.rating}/100 ${c.moodAnalysis.emoji}]` : '';
+      return `${i + 1}. [${when}]${mood} ${body}`;
     })
     .join("\n");
 
@@ -77,6 +111,12 @@ You answer ONLY using the user's timeline context below. If asked to “find X�
 TIMELINE RANGE: ${range}
 TOTAL ENTRIES: ${totalEntries}
 MOST RECENT DAY: ${newestDayKey ?? "Unknown"}
+
+MOOD DISTRIBUTION:
+- High mood (80-100): ${moodStats.high} entries
+- Good mood (60-79): ${moodStats.good} entries
+- Neutral (40-59): ${moodStats.neutral} entries
+- Low mood (1-39): ${moodStats.low} entries
 RECENT DAY COUNTS: ${recentDaySummary || "No recent entries"}
 
 MONTH INDEX (condensed):
