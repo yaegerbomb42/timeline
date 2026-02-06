@@ -40,6 +40,9 @@ export type BatchImportEntry = {
   content: string;
 };
 
+// Firestore batched write limit
+const FIRESTORE_BATCH_SIZE = 500;
+
 function makeExcerpt(text: string, max = 220) {
   const oneLine = text.replace(/\s+/g, " ").trim();
   if (oneLine.length <= max) return oneLine;
@@ -551,7 +554,6 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   let deletedCount = 0;
   let currentBatch = writeBatch(db);
   let operationsInBatch = 0;
-  const BATCH_SIZE = 500; // Firestore limit
   
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
@@ -580,7 +582,7 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
     deletedCount++;
     
     // Commit batch if we've reached the limit
-    if (operationsInBatch >= BATCH_SIZE) {
+    if (operationsInBatch >= FIRESTORE_BATCH_SIZE) {
       await currentBatch.commit();
       currentBatch = writeBatch(db);
       operationsInBatch = 0;
@@ -609,7 +611,7 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
       archiveBatch.delete(docToDelete.ref);
       archiveOps++;
       
-      if (archiveOps >= BATCH_SIZE) {
+      if (archiveOps >= FIRESTORE_BATCH_SIZE) {
         await archiveBatch.commit();
         archiveBatch = writeBatch(db);
         archiveOps = 0;
