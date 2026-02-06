@@ -18,6 +18,8 @@ import { BulkDeleteModal } from "@/components/BulkDeleteModal";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { addChat, deleteChat, useChats, recalculateMoodRatings } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
+import { useMoodAnalysisQueue } from "@/lib/hooks/useMoodAnalysisQueue";
+import { useAiKey } from "@/lib/ai/useAiKey";
 import { cn } from "@/lib/utils";
 
 // Animated background particles
@@ -179,12 +181,18 @@ function AdminPanel({
   onUndoBatch,
   onViewArchive,
   onRecalculateMoods,
+  queueStatus,
+  onStartQueue,
+  onStopQueue,
 }: {
   onBatchImport: () => void;
   onBulkDelete: () => void;
   onUndoBatch: () => void;
   onViewArchive: () => void;
   onRecalculateMoods: () => void;
+  queueStatus?: { pending: number; processing: boolean; processed: number; total: number; errors: number };
+  onStartQueue?: () => void;
+  onStopQueue?: () => void;
 }) {
   return (
     <motion.div
@@ -266,6 +274,45 @@ function AdminPanel({
         <Sparkles className="h-3.5 w-3.5" />
         Sync Moods
       </motion.button>
+      
+      {/* Mood Queue Status & Controls */}
+      {queueStatus && queueStatus.pending > 0 && (
+        <div className="mt-2 pt-2 border-t border-[var(--line)]">
+          <div className="text-[10px] text-[var(--text-secondary)] mb-2 px-1">
+            AI Mood Queue: {queueStatus.pending} pending
+          </div>
+          {queueStatus.processing ? (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onStopQueue}
+              className={cn(
+                "w-full inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+                "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
+              )}
+            >
+              <Zap className="h-3.5 w-3.5 animate-pulse" />
+              Processing... ({queueStatus.processed}/{queueStatus.total})
+            </motion.button>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onStartQueue}
+              className={cn(
+                "w-full inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+                "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+                "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+                "hover:border-[var(--neon-cyan)]"
+              )}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Start AI Analysis
+            </motion.button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -495,6 +542,12 @@ function AdminPasswordModal({
 export function AppShell() {
   const { user, loading: authLoading, signOut, isGuest, isAdmin, signInAsAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
+  const { aiKey, hydrated: aiKeyHydrated } = useAiKey(user?.uid ?? null);
+  const { status: queueStatus, startQueue, stopQueue } = useMoodAnalysisQueue(
+    user?.uid ?? null,
+    aiKey,
+    isAdmin && aiKeyHydrated
+  );
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");
   const newestChatId = chats[0]?.id;
@@ -713,6 +766,9 @@ export function AppShell() {
               setRecalculatingMoods(false);
             }
           }}
+          queueStatus={queueStatus}
+          onStartQueue={startQueue}
+          onStopQueue={stopQueue}
         />
       )}
 
