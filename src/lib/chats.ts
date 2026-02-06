@@ -14,6 +14,7 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
@@ -548,6 +549,9 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   const snapshot = await getDocs(q);
   
   let deletedCount = 0;
+  let currentBatch = writeBatch(db);
+  let operationsInBatch = 0;
+  const BATCH_SIZE = 500; // Firestore limit
   
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
@@ -570,8 +574,22 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
       // Continue with deletion even if archiving fails
     }
     
-    await deleteDoc(docSnap.ref);
+    // Add deletion to batch
+    currentBatch.delete(docSnap.ref);
+    operationsInBatch++;
     deletedCount++;
+    
+    // Commit batch if we've reached the limit
+    if (operationsInBatch >= BATCH_SIZE) {
+      await currentBatch.commit();
+      currentBatch = writeBatch(db);
+      operationsInBatch = 0;
+    }
+  }
+  
+  // Commit any remaining operations
+  if (operationsInBatch > 0) {
+    await currentBatch.commit();
   }
   
   // Clean up old archives (keep only last 30)
@@ -582,8 +600,24 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
     );
     const archiveSnap = await getDocs(archiveQuery);
     const toDelete = archiveSnap.docs.slice(30);
+    
+    // Use batched deletes for archive cleanup too
+    let archiveBatch = writeBatch(db);
+    let archiveOps = 0;
+    
     for (const docToDelete of toDelete) {
-      await deleteDoc(docToDelete.ref);
+      archiveBatch.delete(docToDelete.ref);
+      archiveOps++;
+      
+      if (archiveOps >= BATCH_SIZE) {
+        await archiveBatch.commit();
+        archiveBatch = writeBatch(db);
+        archiveOps = 0;
+      }
+    }
+    
+    if (archiveOps > 0) {
+      await archiveBatch.commit();
     }
   } catch (err) {
     console.error("Failed to clean up archive:", err);
