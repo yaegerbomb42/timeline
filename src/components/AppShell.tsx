@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth";
 import { AnimatePresence, motion, useScroll, useTransform, type MotionValue } from "framer-motion";
-import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2, Archive, Trash2 } from "lucide-react";
+import { ArrowDown01, LogOut, UserCircle2, Sparkles, Zap, Upload, Undo2, Archive, Trash2, Lock } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AuthCard } from "@/components/AuthCard";
@@ -16,7 +16,7 @@ import { UndoBatchModal } from "@/components/UndoBatchModal";
 import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
 import { BulkDeleteModal } from "@/components/BulkDeleteModal";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { addChat, deleteChat, useChats } from "@/lib/chats";
+import { addChat, deleteChat, useChats, recalculateMoodRatings } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
 import { cn } from "@/lib/utils";
 
@@ -74,12 +74,16 @@ function ParallaxHeader({
   scrollY, 
   user, 
   signOut, 
-  isGuest, 
+  isGuest,
+  isAdmin,
+  onAdminAccess,
 }: { 
   scrollY: MotionValue<number>; 
   user: User | null; 
   signOut: () => void;
   isGuest: boolean;
+  isAdmin: boolean;
+  onAdminAccess: () => void;
 }) {
   const headerY = useTransform(scrollY, [0, 300], [0, -50]);
   const headerOpacity = useTransform(scrollY, [0, 200], [1, 0.7]);
@@ -132,6 +136,23 @@ function ParallaxHeader({
             {isGuest ? "Guest (View Only)" : user?.email ?? user?.displayName ?? "Signed in"}
           </div>
         </motion.div>
+        {/* Admin Access Button - Show only when logged in but not yet in admin mode */}
+        {user && !isGuest && !isAdmin && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onAdminAccess}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-2xl border border-[var(--neon-purple)]/50 bg-[var(--neon-purple)]/10 backdrop-blur-xl px-4 py-2.5",
+              "font-sans text-sm text-[var(--neon-purple)] hover:bg-[var(--neon-purple)]/20 transition-all duration-200",
+              "shadow-[0_8px_32px_rgba(131,56,236,0.3)] hover:shadow-[0_12px_40px_rgba(131,56,236,0.5)]",
+              "hover:border-[var(--neon-purple)]"
+            )}
+          >
+            <Lock className="h-4 w-4" />
+            Admin Access
+          </motion.button>
+        )}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -157,11 +178,13 @@ function AdminPanel({
   onBulkDelete,
   onUndoBatch,
   onViewArchive,
+  onRecalculateMoods,
 }: {
   onBatchImport: () => void;
   onBulkDelete: () => void;
   onUndoBatch: () => void;
   onViewArchive: () => void;
+  onRecalculateMoods: () => void;
 }) {
   return (
     <motion.div
@@ -229,6 +252,20 @@ function AdminPanel({
         <Archive className="h-3.5 w-3.5" />
         Archive
       </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onRecalculateMoods}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+          "hover:border-[var(--neon-cyan)]"
+        )}
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        Sync Moods
+      </motion.button>
     </motion.div>
   );
 }
@@ -288,8 +325,175 @@ function CelebrationBurst({ burst }: { burst: SparkBurst }) {
   );
 }
 
+// Admin Password Modal
+function AdminPasswordModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (password: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await onSubmit(password);
+      onClose();
+    } catch (err: any) {
+      setError(err?.message ?? "Invalid admin password");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ duration: 0.3 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-3xl border border-[var(--line)] bg-[var(--bg-elevated)]/95 backdrop-blur-2xl shadow-[0_30px_80px_rgba(0,0,0,0.7)]"
+        style={{
+          boxShadow: "0 30px 80px rgba(0,0,0,0.7), 0 0 50px rgba(131,56,236,0.3) inset",
+        }}
+      >
+        <div className="px-8 pt-8 pb-6 border-b border-[var(--line)]">
+          <div className="flex items-center gap-4">
+            <div
+              className="h-14 w-14 rounded-2xl border border-[var(--neon-purple)]/50 bg-[var(--neon-purple)]/10 flex items-center justify-center"
+              style={{
+                boxShadow: "0 0 30px rgba(131,56,236,0.4)",
+              }}
+            >
+              <Lock className="h-6 w-6 text-[var(--neon-purple)]" />
+            </div>
+            <div>
+              <div className="font-sans text-xs tracking-[0.3em] uppercase text-[var(--text-secondary)]">
+                Timeline
+              </div>
+              <div
+                className="font-book text-2xl leading-tight mt-1"
+                style={{
+                  background: "linear-gradient(135deg, var(--neon-purple), var(--neon-pink))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Admin Access
+              </div>
+            </div>
+          </div>
+          <p className="mt-5 text-sm leading-6 text-[var(--text-secondary)]">
+            Enter the admin password to access advanced features like batch import and bulk delete.
+          </p>
+        </div>
+
+        <div className="px-8 py-7">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block">
+              <span className="mb-2 inline-flex items-center gap-2 font-sans text-xs text-[var(--text-secondary)]">
+                <Lock className="h-4 w-4 text-[var(--neon-purple)]" /> Admin Password
+              </span>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                autoComplete="off"
+                placeholder="••••••••"
+                autoFocus
+                className="w-full rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl px-4 py-3.5 font-sans text-sm text-[var(--text-primary)] outline-none focus:ring-4 focus:ring-[var(--glow-purple)] transition-all"
+                style={{
+                  boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+                }}
+                required
+              />
+            </label>
+
+            <div className="flex gap-3">
+              <motion.button
+                type="button"
+                onClick={onClose}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={cn(
+                  "flex-1 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+                  "px-5 py-3.5 font-sans text-sm text-[var(--text-primary)] font-medium",
+                  "hover:bg-[var(--bg-surface)]/80 transition-all duration-300"
+                )}
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                type="submit"
+                disabled={busy}
+                whileHover={!busy ? { scale: 1.02 } : {}}
+                whileTap={!busy ? { scale: 0.98 } : {}}
+                className={cn(
+                  "flex-1 rounded-2xl px-5 py-3.5 font-sans text-sm font-bold text-white",
+                  "bg-gradient-to-r from-[var(--neon-purple)] to-[var(--neon-pink)]",
+                  "shadow-[0_15px_50px_rgba(131,56,236,0.5)]",
+                  "hover:shadow-[0_20px_60px_rgba(131,56,236,0.6)] transition-all",
+                  "disabled:opacity-60 disabled:cursor-not-allowed",
+                  "flex items-center justify-center gap-2"
+                )}
+              >
+                {busy ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Zap className="h-4 w-4" />
+                    </motion.div>
+                    Verifying…
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Sign In
+                  </>
+                )}
+              </motion.button>
+            </div>
+
+            <AnimatePresence>
+              {error ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                  className="rounded-2xl border border-[var(--neon-pink)]/50 bg-[var(--bg-surface)]/80 px-4 py-3 text-sm text-[var(--text-primary)]"
+                  style={{
+                    boxShadow: "0 0 20px rgba(255,0,110,0.3)",
+                  }}
+                >
+                  {error}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </form>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export function AppShell() {
-  const { user, loading: authLoading, signOut, isGuest, isAdmin } = useAuth();
+  const { user, loading: authLoading, signOut, isGuest, isAdmin, signInAsAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");
@@ -299,8 +503,10 @@ export function AppShell() {
   const [batchImportFile, setBatchImportFile] = useState<File | undefined>(undefined);
   const [showUndoBatch, setShowUndoBatch] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
-  const [burst, setBurst] = useState<SparkBurst | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [recalculatingMoods, setRecalculatingMoods] = useState(false);
+  const [burst, setBurst] = useState<SparkBurst | null>(null);
   const [flight, setFlight] = useState<
     | null
     | {
@@ -486,8 +692,41 @@ export function AppShell() {
           onBulkDelete={() => setShowBulkDelete(true)}
           onUndoBatch={() => setShowUndoBatch(true)}
           onViewArchive={() => setShowArchive(true)}
+          onRecalculateMoods={async () => {
+            if (!user?.uid) return;
+            if (recalculatingMoods) return;
+            
+            const confirmed = window.confirm(
+              "This will recalculate mood ratings for all entries that don't have them. Continue?"
+            );
+            if (!confirmed) return;
+            
+            setRecalculatingMoods(true);
+            try {
+              const updated = await recalculateMoodRatings(user.uid, (current, total) => {
+                console.log(`Recalculating moods: ${current}/${total}`);
+              });
+              alert(`Successfully recalculated ${updated} mood ratings!`);
+            } catch (err: any) {
+              alert(`Failed to recalculate moods: ${err.message}`);
+            } finally {
+              setRecalculatingMoods(false);
+            }
+          }}
         />
       )}
+
+      {/* Admin Password Modal */}
+      <AnimatePresence>
+        {showAdminPassword && (
+          <AdminPasswordModal
+            onClose={() => setShowAdminPassword(false)}
+            onSubmit={async (password) => {
+              await signInAsAdmin(password);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="mx-auto w-full max-w-7xl relative z-10">
         <ParallaxHeader 
@@ -495,6 +734,8 @@ export function AppShell() {
           user={user} 
           signOut={signOut} 
           isGuest={isGuest}
+          isAdmin={isAdmin}
+          onAdminAccess={() => setShowAdminPassword(true)}
         />
 
         {/* Primary panels - Hidden for guest mode */}

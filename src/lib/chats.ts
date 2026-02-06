@@ -13,6 +13,7 @@ import {
   deleteDoc,
   getDocs,
   getDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
@@ -610,6 +611,48 @@ export async function getBatchEntryCounts(uid: string): Promise<Map<string, numb
   }
   
   return counts;
+}
+
+/**
+ * Recalculate mood ratings for all existing entries that don't have them
+ * This ensures all entries have mood analysis, even those created before the feature
+ */
+export async function recalculateMoodRatings(uid: string, onProgress?: (current: number, total: number) => void): Promise<number> {
+  const q = query(collection(db, "users", uid, "chats"));
+  const snapshot = await getDocs(q);
+  
+  let updated = 0;
+  const total = snapshot.docs.length;
+  
+  for (let i = 0; i < snapshot.docs.length; i++) {
+    const docSnap = snapshot.docs[i]!;
+    const data = docSnap.data();
+    
+    // Only update if mood analysis is missing
+    if (!data.moodAnalysis && data.text) {
+      const text = String(data.text);
+      const mood = analyzeMood(text);
+      const moodAnalysis = analyzeMoodDetailed(text);
+      
+      try {
+        await runTransaction(db, async (transaction) => {
+          transaction.update(docSnap.ref, {
+            mood,
+            moodAnalysis,
+          });
+        });
+        updated++;
+      } catch (err) {
+        console.error(`Failed to update mood for chat ${docSnap.id}:`, err);
+      }
+    }
+    
+    if (onProgress) {
+      onProgress(i + 1, total);
+    }
+  }
+  
+  return updated;
 }
 
 
