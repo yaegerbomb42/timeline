@@ -19,8 +19,9 @@ type QueueStatus = {
   errors: number;
 };
 
-const BATCH_SIZE = 15; // Process 15 entries at a time for optimal balance
+const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
+const MAX_BATCH_SIZE_API = 25; // API can handle up to 25, but we use 15 for optimal balance
 
 /**
  * Hook to manage background mood analysis queue
@@ -73,6 +74,11 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   }, [uid, enabled]);
 
   const processBatch = useCallback(async (entries: PendingEntry[]): Promise<number> => {
+    if (!uid) {
+      console.warn("No UID available for mood analysis");
+      return 0;
+    }
+    
     if (!apiKey) {
       console.warn("No API key available for mood analysis");
       return 0;
@@ -106,7 +112,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       let updated = 0;
       for (const result of results) {
         try {
-          const docRef = doc(db, "users", uid!, "chats", result.id);
+          const docRef = doc(db, "users", uid, "chats", result.id);
           await updateDoc(docRef, {
             mood: result.mood,
             moodAnalysis: {

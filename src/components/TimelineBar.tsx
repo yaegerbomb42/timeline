@@ -3,7 +3,7 @@
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, memo } from "react";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
@@ -20,8 +20,8 @@ function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
 }
 
-// Glowing dot with particle trail and date label
-function GlowingDot({
+// Glowing dot with particle trail and date label - Memoized for performance
+const GlowingDot = memo(function GlowingDot({
   chat,
   isNewest,
   isHighlighted,
@@ -179,7 +179,7 @@ function GlowingDot({
       )}
     </div>
   );
-}
+});
 
 export function TimelineBar({
   groupedByDay,

@@ -14,6 +14,9 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  writeBatch,
+  type QueryDocumentSnapshot,
+  type DocumentData,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
@@ -528,11 +531,7 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   
   let deletedCount = 0;
   const BATCH_SIZE = 500; // Firestore batch write limit
-  let currentBatch: any[] = [];
-  let batchIndex = 0;
-  
-  // Import writeBatch from firebase/firestore
-  const { writeBatch } = await import("firebase/firestore");
+  let currentBatch: QueryDocumentSnapshot<DocumentData>[] = [];
   
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
@@ -587,8 +586,7 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
     
     // Also batch delete archives for efficiency
     if (toDelete.length > 0) {
-      const { writeBatch: createBatch } = await import("firebase/firestore");
-      const archiveBatch = createBatch(db);
+      const archiveBatch = writeBatch(db);
       toDelete.forEach(doc => archiveBatch.delete(doc.ref));
       await archiveBatch.commit();
     }

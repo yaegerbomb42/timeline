@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing or invalid entries array." }, { status: 400 });
   }
 
-  // Limit batch size to 25 entries max
+  // Limit batch size to 25 entries max (API limit, hook uses 15 for optimal balance)
   if (body.entries.length > 25) {
     return NextResponse.json({ error: "Maximum 25 entries per batch." }, { status: 400 });
   }
@@ -94,6 +94,8 @@ Respond ONLY with the JSON array, no other text.`;
   try {
     const ai = new GoogleGenAI({ apiKey });
 
+    // Temperature 0.3: Provides consistent mood ratings while maintaining contextual understanding
+    // Lower values (0.1-0.2) would be too rigid, higher (0.5+) too variable for mood consistency
     const config = {
       temperature: 0.3,
       topK: 20,
