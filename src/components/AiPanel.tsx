@@ -601,7 +601,7 @@ export function AiPanel({
                   disabled={busy}
                   className={cn(
                     "text-xs px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60",
-                    "text-[var(--text-secondary)} hover:text-[var(--text-primary)]",
+                    "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
                     "hover:border-[var(--neon-cyan)] transition-colors",
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
