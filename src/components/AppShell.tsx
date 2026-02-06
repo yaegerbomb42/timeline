@@ -16,7 +16,7 @@ import { UndoBatchModal } from "@/components/UndoBatchModal";
 import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
 import { BulkDeleteModal } from "@/components/BulkDeleteModal";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { addChat, deleteChat, useChats } from "@/lib/chats";
+import { addChat, deleteChat, useChats, recalculateMoodRatings } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
 import { cn } from "@/lib/utils";
 
@@ -178,11 +178,13 @@ function AdminPanel({
   onBulkDelete,
   onUndoBatch,
   onViewArchive,
+  onRecalculateMoods,
 }: {
   onBatchImport: () => void;
   onBulkDelete: () => void;
   onUndoBatch: () => void;
   onViewArchive: () => void;
+  onRecalculateMoods: () => void;
 }) {
   return (
     <motion.div
@@ -249,6 +251,20 @@ function AdminPanel({
       >
         <Archive className="h-3.5 w-3.5" />
         Archive
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onRecalculateMoods}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+          "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+          "hover:border-[var(--neon-cyan)]"
+        )}
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        Sync Moods
       </motion.button>
     </motion.div>
   );
@@ -489,6 +505,7 @@ export function AppShell() {
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [recalculatingMoods, setRecalculatingMoods] = useState(false);
   const [burst, setBurst] = useState<SparkBurst | null>(null);
   const [flight, setFlight] = useState<
     | null
@@ -675,6 +692,27 @@ export function AppShell() {
           onBulkDelete={() => setShowBulkDelete(true)}
           onUndoBatch={() => setShowUndoBatch(true)}
           onViewArchive={() => setShowArchive(true)}
+          onRecalculateMoods={async () => {
+            if (!user?.uid) return;
+            if (recalculatingMoods) return;
+            
+            const confirmed = window.confirm(
+              "This will recalculate mood ratings for all entries that don't have them. Continue?"
+            );
+            if (!confirmed) return;
+            
+            setRecalculatingMoods(true);
+            try {
+              const updated = await recalculateMoodRatings(user.uid, (current, total) => {
+                console.log(`Recalculating moods: ${current}/${total}`);
+              });
+              alert(`Successfully recalculated ${updated} mood ratings!`);
+            } catch (err: any) {
+              alert(`Failed to recalculate moods: ${err.message}`);
+            } finally {
+              setRecalculatingMoods(false);
+            }
+          }}
         />
       )}
 

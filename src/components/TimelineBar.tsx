@@ -46,21 +46,22 @@ function GlowingDot({
   // Format date for display
   const dateLabel = format(chat.createdAt, "MMM d");
   const timeLabel = format(chat.createdAt, "h:mm a");
+  const fullDate = format(chat.createdAt, "MMM d, yyyy");
   
   // Label positioning constants
   // Spacing values chosen for optimal visual separation and readability
   const DOT_SIZE = 16; // Base size of the timeline dot (from dotPx calculation)
-  const LABEL_VERTICAL_SPACING = 32; // Space between dot edge and label (2x dot size for comfortable gap)
-  const LABEL_MARGIN = 8; // Small margin when label is placed below dot
-  const MOOD_LABEL_OFFSET = 60; // Extra space for mood emoji/rating label
+  const LABEL_VERTICAL_SPACING = 38; // Space between dot edge and label
+  const LABEL_MARGIN = 10; // Small margin when label is placed below dot
+  const MOOD_LABEL_OFFSET = 68; // Extra space for mood emoji/rating label
   
-  // When yOffset < -100 (dot is high on rollercoaster), place label below to avoid overlap with top edge
+  // When yOffset < -80 (dot is high on rollercoaster), place label below to avoid overlap with top edge
   // Otherwise place label above the dot for better visibility
   const LABEL_ABOVE_DOT = `-${LABEL_VERTICAL_SPACING}px`;
   const LABEL_BELOW_DOT = `calc(100% + ${LABEL_MARGIN}px)`;
   const MOOD_ABOVE_DOT = `-${MOOD_LABEL_OFFSET}px`;
   const MOOD_BELOW_DOT = `calc(100% + ${LABEL_VERTICAL_SPACING}px)`;
-  const HIGH_POSITION_THRESHOLD = -100; // Y offset where we switch label position
+  const HIGH_POSITION_THRESHOLD = -80; // Y offset where we switch label position
     
   return (
     <div className="relative group/dot">
@@ -72,44 +73,45 @@ function GlowingDot({
         initial={{ opacity: 0, scale: 0.3, y: 10 }}
         animate={{
           opacity: 1,
-          scale: isHighlighted ? [1, 1.3, 1] : 1,
+          scale: isHighlighted ? [1, 1.4, 1] : isNewest ? 1.1 : 1,
           y: yOffset,
           boxShadow: isHighlighted
             ? [
                 `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
-                `0 0 0 15px ${moodColorRgba}`,
-                `0 0 0 8px ${moodColorRgba.replace('0.6', '0.4')}`,
+                `0 0 0 18px ${moodColorRgba}`,
+                `0 0 0 10px ${moodColorRgba.replace('0.6', '0.4')}`,
                 `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
               ]
             : isNewest
-              ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
-              : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
+              ? `0 0 24px ${moodColorRgba}, 0 0 48px ${moodColorRgba.replace('0.6', '0.4')}`
+              : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
         exit={{ opacity: 0, scale: 0.3, y: 10 }}
         transition={{
           duration: isHighlighted ? 1.5 : 0.4,
           ease: [0.22, 1, 0.36, 1],
         }}
-        whileHover={{ scale: 1.3, y: yOffset - 2 }}
+        whileHover={{ scale: 1.4, y: yOffset - 3 }}
         whileTap={{ scale: 0.9 }}
         className={cn(
-          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10",
+          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10 border-2",
         )}
         style={{
           width: size,
           height: size,
           background: `radial-gradient(circle, ${moodColor}, ${moodColor}dd)`,
+          borderColor: moodColor,
           boxShadow: isNewest 
-            ? `0 0 20px ${moodColorRgba}, 0 0 40px ${moodColorRgba.replace('0.6', '0.4')}`
-            : `0 0 10px ${moodColorRgba.replace('0.6', '0.3')}`,
+            ? `0 0 24px ${moodColorRgba}, 0 0 48px ${moodColorRgba.replace('0.6', '0.4')}`
+            : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
         {isNewest && (
           <motion.div
             className="absolute inset-0 rounded-full"
             animate={{
-              scale: [1, 1.5, 1],
-              opacity: [0.6, 0, 0.6],
+              scale: [1, 1.6, 1],
+              opacity: [0.7, 0, 0.7],
             }}
             transition={{ duration: 2, repeat: Infinity }}
             style={{
@@ -119,37 +121,62 @@ function GlowingDot({
         )}
       </motion.button>
       
-      {/* Date label that shows on group hover - aria-hidden as info is in button's aria-label */}
+      {/* Date label - always visible, not just on hover */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
-        style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? LABEL_BELOW_DOT : LABEL_ABOVE_DOT }}
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap transition-all duration-200"
+        style={{ 
+          top: yOffset < HIGH_POSITION_THRESHOLD ? LABEL_BELOW_DOT : LABEL_ABOVE_DOT,
+          opacity: 1,
+        }}
         aria-hidden="true"
       >
-        <div 
-          className="text-[10px] font-mono font-semibold px-2 py-1 rounded-md"
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-lg shadow-lg group-hover/dot:scale-110 transition-transform duration-200"
           style={{
-            background: `${moodColor}22`,
-            border: `1px solid ${moodColor}66`,
+            background: `linear-gradient(135deg, ${moodColor}33, ${moodColor}22)`,
+            border: `1.5px solid ${moodColor}88`,
             color: moodColor,
-            textShadow: `0 0 8px ${moodColor}`,
+            textShadow: `0 0 10px ${moodColor}aa`,
+            boxShadow: `0 2px 8px ${moodColor}44, 0 0 16px ${moodColor}22`,
           }}
         >
-          <div>{dateLabel}</div>
-          <div className="opacity-70">{timeLabel}</div>
-        </div>
+          <div className="font-bold tracking-wide">{fullDate}</div>
+          <div className="opacity-80 text-[9px] mt-0.5">{timeLabel}</div>
+        </motion.div>
       </div>
       
-      {/* Show mood info on group hover - aria-hidden as info is in button's aria-label */}
+      {/* Show mood info - enhanced display */}
       {chat.moodAnalysis && (
         <div
-          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity duration-200"
-          style={{ top: yOffset < HIGH_POSITION_THRESHOLD ? MOOD_ABOVE_DOT : MOOD_BELOW_DOT }}
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap transition-all duration-200"
+          style={{ 
+            top: yOffset < HIGH_POSITION_THRESHOLD ? MOOD_BELOW_DOT : MOOD_ABOVE_DOT,
+            opacity: 1,
+          }}
           aria-hidden="true"
         >
-          <div className="text-lg">{chat.moodAnalysis.emoji}</div>
-          <div className="text-[10px] font-mono text-[var(--text-secondary)]">
-            {chat.moodAnalysis.rating}/100
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="group-hover/dot:scale-125 transition-transform duration-200"
+          >
+            <div className="text-2xl drop-shadow-lg mb-1 group-hover/dot:scale-110 transition-transform">{chat.moodAnalysis.emoji}</div>
+            <div 
+              className="text-[10px] font-mono font-bold px-2 py-1 rounded-md shadow-md"
+              style={{
+                background: `${moodColor}22`,
+                border: `1px solid ${moodColor}55`,
+                color: moodColor,
+                textShadow: `0 0 6px ${moodColor}88`,
+              }}
+            >
+              {chat.moodAnalysis.rating}/100
+            </div>
+          </motion.div>
         </div>
       )}
     </div>
@@ -320,15 +347,15 @@ export function TimelineBar({
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth="3"
+                strokeWidth="4"
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 0.9 }}
+                animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 2, ease: "easeInOut" }}
                 style={{
-                  filter: 'drop-shadow(0 0 12px var(--glow-cyan))',
+                  filter: 'drop-shadow(0 0 16px var(--glow-cyan)) drop-shadow(0 0 8px var(--glow-purple))',
                 }}
               />
             )}
@@ -360,7 +387,7 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const dotPx = Math.max(12, Math.min(20, 16));
+              const dotPx = Math.max(14, Math.min(22, 18)); // Slightly larger dots
 
               return (
                 <motion.div
