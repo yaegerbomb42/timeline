@@ -697,7 +697,7 @@ export function AppShell() {
             if (recalculatingMoods) return;
             
             const confirmed = window.confirm(
-              "This will recalculate mood ratings for all entries that don't have them. Continue?"
+              "This will recalculate mood ratings for all entries that don't have them or are missing the detailed rationale. Continue?"
             );
             if (!confirmed) return;
             

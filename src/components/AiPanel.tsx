@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { KeyRound, LibraryBig, Sparkles, Zap, Brain, Cpu, Cloud, ArrowLeft } from "lucide-react";
 import { useMemo, useState, useRef, useEffect } from "react";
 
-import { buildTimelineContext } from "@/lib/ai/context";
+import { buildTimelineContext, buildFilteredSummary } from "@/lib/ai/context";
 import type { MonthIndex } from "@/lib/ai/monthIndex";
 import { useMonthIndex } from "@/lib/ai/monthIndex";
 import { useAiKey } from "@/lib/ai/useAiKey";
@@ -128,7 +128,25 @@ export function AiPanel({
     setWebllmProgress(null);
     
     try {
-      const context = buildTimelineContext({ months: monthIndex, chats });
+      let context = buildTimelineContext({ months: monthIndex, chats });
+      
+      // Detect filtered queries and add specific data
+      const lowerQ = q.toLowerCase();
+      if (lowerQ.includes("above 80") || lowerQ.includes("> 80") || lowerQ.includes("high mood") || lowerQ.includes("best days")) {
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating >= 80));
+        context += "\n\nFILTERED ENTRIES (mood >= 80):\n" + filteredSummary;
+      } else if (lowerQ.includes("below 40") || lowerQ.includes("< 40") || lowerQ.includes("low mood") || lowerQ.includes("worst days")) {
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating < 40));
+        context += "\n\nFILTERED ENTRIES (mood < 40):\n" + filteredSummary;
+      } else if (lowerQ.match(/above (\d+)/)) {
+        const threshold = parseInt(lowerQ.match(/above (\d+)/)?.[1] ?? "0", 10);
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating >= threshold));
+        context += `\n\nFILTERED ENTRIES (mood >= ${threshold}):\n` + filteredSummary;
+      } else if (lowerQ.match(/below (\d+)/)) {
+        const threshold = parseInt(lowerQ.match(/below (\d+)/)?.[1] ?? "0", 10);
+        const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating < threshold));
+        context += `\n\nFILTERED ENTRIES (mood < ${threshold}):\n` + filteredSummary;
+      }
       
       if (effectiveMode === "local") {
         // Use WebLLM local model
