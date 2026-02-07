@@ -536,7 +536,6 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   let currentBatch = writeBatch(db);
   let operationsInBatch = 0;
   const BATCH_SIZE = 500; // Firestore batch write limit
-  let currentBatch: QueryDocumentSnapshot<DocumentData>[] = [];
   
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
@@ -621,10 +620,6 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
     }
     
     if (archiveOps > 0) {
-    // Also batch delete archives for efficiency
-    if (toDelete.length > 0) {
-      const archiveBatch = writeBatch(db);
-      toDelete.forEach(doc => archiveBatch.delete(doc.ref));
       await archiveBatch.commit();
     }
   } catch (err) {
