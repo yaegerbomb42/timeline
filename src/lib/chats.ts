@@ -574,25 +574,6 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   // Commit any remaining operations
   if (operationsInBatch > 0) {
     await currentBatch.commit();
-    currentBatch.push(docSnap);
-    
-    // When batch is full, commit and start a new one
-    if (currentBatch.length >= BATCH_SIZE) {
-      const batch = writeBatch(db);
-      currentBatch.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-      deletedCount += currentBatch.length;
-      currentBatch = [];
-      batchIndex++;
-    }
-  }
-  
-  // Commit remaining items in the last batch
-  if (currentBatch.length > 0) {
-    const batch = writeBatch(db);
-    currentBatch.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
-    deletedCount += currentBatch.length;
   }
   
   // Clean up old archives (keep only last 30)
