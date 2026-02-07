@@ -3,7 +3,7 @@
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, memo } from "react";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
@@ -20,8 +20,8 @@ function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
 }
 
-// Glowing dot with particle trail and date label
-function GlowingDot({
+// Glowing dot with particle trail and date label - Memoized for performance
+const GlowingDot = memo(function GlowingDot({
   chat,
   isNewest,
   isHighlighted,
@@ -44,16 +44,14 @@ function GlowingDot({
     : 'rgba(0,245,255,0.6)';
   
   // Format date for display
-  const dateLabel = format(chat.createdAt, "MMM d");
   const timeLabel = format(chat.createdAt, "h:mm a");
   const fullDate = format(chat.createdAt, "MMM d, yyyy");
   
-  // Label positioning constants
-  // Spacing values chosen for optimal visual separation and readability
-  const DOT_SIZE = 16; // Base size of the timeline dot (from dotPx calculation)
-  const LABEL_VERTICAL_SPACING = 38; // Space between dot edge and label
-  const LABEL_MARGIN = 10; // Small margin when label is placed below dot
-  const MOOD_LABEL_OFFSET = 68; // Extra space for mood emoji/rating label
+  // Label positioning constants - IMPROVED SPACING
+  // Spacing values optimized for better visual separation and readability with large datasets
+  const LABEL_VERTICAL_SPACING = 48; // Increased from 38 to 48 for more breathing room
+  const LABEL_MARGIN = 12; // Increased from 10 to 12 for better separation
+  const MOOD_LABEL_OFFSET = 80; // Increased from 68 to 80 for clearer separation
   
   // When yOffset < -80 (dot is high on rollercoaster), place label below to avoid overlap with top edge
   // Otherwise place label above the dot for better visibility
@@ -181,7 +179,7 @@ function GlowingDot({
       )}
     </div>
   );
-}
+});
 
 export function TimelineBar({
   groupedByDay,
@@ -194,7 +192,7 @@ export function TimelineBar({
   highlightChatId?: string | null;
   onSelectChat?: (chatId: string) => void;
 }) {
-  const viewport = useElementSize<HTMLDivElement>();
+  const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
 
   const days = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -209,26 +207,41 @@ export function TimelineBar({
   }, [groupedByDay]);
 
   const { slotWidth, trackWidth, scrollable, labelStride } = useMemo(() => {
-    const width = viewport.width || 0;
+    const width = viewportWidth || 0;
     const count = days.length || 1;
-    const minSlot = 16;
-    const maxSlot = 80;
+    
+    // Optimized spacing for large datasets (1600+ entries)
+    // Increase minimum slot width for better readability and spacing
+    const minSlot = count > 500 ? 28 : count > 200 ? 24 : 20;
+    const maxSlot = 100; // Increased max for better flow
     const ideal = width > 0 ? width / count : minSlot;
     const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
     const canScroll = width > 0 ? track > width + 1 : false;
-    // Adjust stride to show more labels when there's enough space
-    const stride = slot >= 40 ? Math.max(1, Math.ceil(60 / slot)) : Math.max(1, Math.ceil(100 / slot));
+    
+    // Adaptive label stride based on dataset size and slot width
+    // For large datasets, show fewer labels to reduce clutter
+    let stride;
+    if (count > 1000) {
+      stride = Math.max(30, Math.ceil(150 / slot));
+    } else if (count > 500) {
+      stride = Math.max(20, Math.ceil(120 / slot));
+    } else if (count > 200) {
+      stride = Math.max(10, Math.ceil(100 / slot));
+    } else {
+      stride = slot >= 40 ? Math.max(1, Math.ceil(60 / slot)) : Math.max(1, Math.ceil(80 / slot));
+    }
+    
     return { slotWidth: slot, trackWidth: track, scrollable: canScroll, labelStride: stride };
-  }, [viewport.width, days.length]);
+  }, [viewportWidth, days.length]);
 
   // Auto-scroll to the newest side when the line overflows.
   useEffect(() => {
     if (!scrollable) return;
-    const el = viewport.ref.current;
+    const el = viewportRef.current;
     if (!el) return;
     el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
-  }, [scrollable, newestChatId, viewport.ref]);
+  }, [scrollable, newestChatId, viewportRef]);
 
   const rangeLabel = useMemo(() => {
     if (days.length === 0) return "No entries yet";
@@ -269,7 +282,7 @@ export function TimelineBar({
       </div>
 
       <div
-        ref={viewport.ref}
+        ref={viewportRef}
         className={cn(
           "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
           "flex-1",
@@ -320,6 +333,7 @@ export function TimelineBar({
                   if (points.length < 2) return '';
                   
                   // Create smooth cubic Bézier curve through points for flowing line
+                  // Improved smoothing with adaptive tension based on distance
                   let path = `M ${points[0]!.x} ${points[0]!.y}`;
                   
                   for (let i = 1; i < points.length; i++) {
@@ -327,10 +341,18 @@ export function TimelineBar({
                     const curr = points[i]!;
                     
                     // Calculate control points for smooth curve
-                    // Tension factor controls curve smoothness: 0.0 = sharp angles, 1.0 = very smooth
-                    // 0.4 chosen as optimal balance: smooth flow without overshooting or flattening
-                    const tension = 0.4;
+                    // Adaptive tension: smoother for close points, tighter for distant points
                     const dx = curr.x - prev.x;
+                    const dy = Math.abs(curr.y - prev.y);
+                    
+                    // Base tension adjusted for better flow
+                    // Increased from 0.4 to 0.5 for smoother, more flowing curves
+                    let tension = 0.5;
+                    
+                    // Reduce tension for large vertical changes to avoid overshooting
+                    if (dy > 50) {
+                      tension = 0.35;
+                    }
                     
                     // Control point 1 (from previous point)
                     const cp1x = prev.x + dx * tension;

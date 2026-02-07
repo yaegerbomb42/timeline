@@ -275,7 +275,7 @@ export function BatchImportModal({
                 />
               </div>
               <div className="text-xs text-[var(--text-secondary)] text-center">
-                Processing with mood analysis... This may take a few moments.
+                Adding entries instantly... Mood analysis will run in background.
               </div>
             </div>
           ) : null}
