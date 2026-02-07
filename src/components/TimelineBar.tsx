@@ -20,6 +20,26 @@ function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
 }
 
+// Helper function to determine minimum slot width based on entry count
+function getMinSlotWidth(count: number): number {
+  if (count > 2000) return 8;
+  if (count > 1000) return 12;
+  if (count > 500) return 16;
+  return 20;
+}
+
+// Helper function to calculate label stride based on count and slot width
+function calculateLabelStride(count: number, slot: number): number {
+  if (count > 2000) return Math.max(100, Math.ceil(800 / slot));
+  if (count > 1000) return Math.max(60, Math.ceil(480 / slot));
+  if (count > 500) return Math.max(30, Math.ceil(240 / slot));
+  if (count > 200) return Math.max(15, Math.ceil(120 / slot));
+  return Math.max(5, Math.ceil(60 / slot));
+}
+
+// Minimum height for timeline container to ensure adequate space for rollercoaster visualization
+const MIN_TIMELINE_HEIGHT = 340;
+
 // Glowing dot with rating inside - Memoized for performance
 const GlowingDot = memo(function GlowingDot({
   chat,
@@ -92,8 +112,8 @@ const GlowingDot = memo(function GlowingDot({
         <span 
           className="text-[9px] font-bold font-mono pointer-events-none"
           style={{
-            color: 'rgba(0, 0, 0, 0.8)',
-            textShadow: `0 0 2px ${moodColor}`,
+            color: 'rgba(255, 255, 255, 0.95)',
+            textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
           }}
         >
           {rating}
@@ -147,25 +167,14 @@ export function TimelineBar({
     
     // Ultra-compact spacing for high-density display
     // Allow elements to be very close together - users will zoom to see detail
-    const minSlot = count > 2000 ? 8 : count > 1000 ? 12 : count > 500 ? 16 : 20;
+    const minSlot = getMinSlotWidth(count);
     const maxSlot = 60;
     const ideal = width > 0 ? width / count : minSlot;
     const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
     
     // Show date labels very sparingly to avoid clutter
-    let stride;
-    if (count > 2000) {
-      stride = Math.max(100, Math.ceil(800 / slot));
-    } else if (count > 1000) {
-      stride = Math.max(60, Math.ceil(480 / slot));
-    } else if (count > 500) {
-      stride = Math.max(30, Math.ceil(240 / slot));
-    } else if (count > 200) {
-      stride = Math.max(15, Math.ceil(120 / slot));
-    } else {
-      stride = Math.max(5, Math.ceil(60 / slot));
-    }
+    const stride = calculateLabelStride(count, slot);
     
     return { slotWidth: slot, trackWidth: track, labelStride: stride };
   }, [viewportWidth, days.length]);
@@ -206,7 +215,7 @@ export function TimelineBar({
             <>
               <Sparkles className="h-3 w-3 text-[var(--neon-purple)]" />
               {days.length} day{days.length === 1 ? "" : "s"}
-              <span className="text-[10px] opacity-60 ml-2">(pinch to zoom)</span>
+              <span className="text-[10px] opacity-75 ml-2">(pinch to zoom)</span>
             </>
           )}
         </motion.div>
@@ -227,6 +236,7 @@ export function TimelineBar({
         <div
           className="relative min-h-[340px] h-full overflow-auto"
           style={{
+            minHeight: MIN_TIMELINE_HEIGHT,
             width: '100%',
             scrollbarWidth: "thin",
             scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
