@@ -47,19 +47,10 @@ const GlowingDot = memo(function GlowingDot({
   const timeLabel = format(chat.createdAt, "h:mm a");
   const fullDate = format(chat.createdAt, "MMM d, yyyy");
   
-  // Label positioning constants - IMPROVED SPACING
-  // Spacing values optimized for better visual separation and readability with large datasets
-  const LABEL_VERTICAL_SPACING = 48; // Increased from 38 to 48 for more breathing room
-  const LABEL_MARGIN = 12; // Increased from 10 to 12 for better separation
-  const MOOD_LABEL_OFFSET = 80; // Increased from 68 to 80 for clearer separation
-  
-  // When yOffset < -80 (dot is high on rollercoaster), place label below to avoid overlap with top edge
-  // Otherwise place label above the dot for better visibility
-  const LABEL_ABOVE_DOT = `-${LABEL_VERTICAL_SPACING}px`;
-  const LABEL_BELOW_DOT = `calc(100% + ${LABEL_MARGIN}px)`;
-  const MOOD_ABOVE_DOT = `-${MOOD_LABEL_OFFSET}px`;
-  const MOOD_BELOW_DOT = `calc(100% + ${LABEL_VERTICAL_SPACING}px)`;
-  const HIGH_POSITION_THRESHOLD = -80; // Y offset where we switch label position
+  // Label positioning constants - ROLLERCOASTER FLOW STYLE
+  // All labels positioned below the node for consistent rollercoaster flow appearance
+  const DATE_LABEL_OFFSET = 12; // Distance below the node for date label
+  const SENTIMENT_LABEL_OFFSET = 70; // Distance below the date for sentiment score
     
   return (
     <div className="relative group/dot">
@@ -119,11 +110,11 @@ const GlowingDot = memo(function GlowingDot({
         )}
       </motion.button>
       
-      {/* Date label - always visible, not just on hover */}
+      {/* Date label - always below the node for consistent rollercoaster flow */}
       <div
         className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap transition-all duration-200"
         style={{ 
-          top: yOffset < HIGH_POSITION_THRESHOLD ? LABEL_BELOW_DOT : LABEL_ABOVE_DOT,
+          top: `calc(100% + ${DATE_LABEL_OFFSET}px)`,
           opacity: 1,
         }}
         aria-hidden="true"
@@ -132,7 +123,7 @@ const GlowingDot = memo(function GlowingDot({
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-lg shadow-lg group-hover/dot:scale-110 transition-transform duration-200"
+          className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg shadow-lg group-hover/dot:scale-110 transition-transform duration-200"
           style={{
             background: `linear-gradient(135deg, ${moodColor}33, ${moodColor}22)`,
             border: `1.5px solid ${moodColor}88`,
@@ -146,12 +137,12 @@ const GlowingDot = memo(function GlowingDot({
         </motion.div>
       </div>
       
-      {/* Show mood info - enhanced display */}
+      {/* Sentiment score label - always below the date with emoji */}
       {chat.moodAnalysis && (
         <div
           className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap transition-all duration-200"
           style={{ 
-            top: yOffset < HIGH_POSITION_THRESHOLD ? MOOD_BELOW_DOT : MOOD_ABOVE_DOT,
+            top: `calc(100% + ${SENTIMENT_LABEL_OFFSET}px)`,
             opacity: 1,
           }}
           aria-hidden="true"
@@ -162,7 +153,7 @@ const GlowingDot = memo(function GlowingDot({
             transition={{ delay: 0.4 }}
             className="group-hover/dot:scale-125 transition-transform duration-200"
           >
-            <div className="text-2xl drop-shadow-lg mb-1 group-hover/dot:scale-110 transition-transform">{chat.moodAnalysis.emoji}</div>
+            <div className="text-xl drop-shadow-lg mb-1 group-hover/dot:scale-110 transition-transform">{chat.moodAnalysis.emoji}</div>
             <div 
               className="text-[10px] font-mono font-bold px-2 py-1 rounded-md shadow-md"
               style={{
@@ -172,7 +163,7 @@ const GlowingDot = memo(function GlowingDot({
                 textShadow: `0 0 6px ${moodColor}88`,
               }}
             >
-              {chat.moodAnalysis.rating}/100
+              Score: {chat.moodAnalysis.rating}
             </div>
           </motion.div>
         </div>
@@ -296,7 +287,7 @@ export function TimelineBar({
         }}
       >
         <div
-          className="relative min-h-[220px] h-full"
+          className="relative min-h-[340px] h-full"
           style={{
             width: trackWidth,
             minWidth: "100%",
@@ -345,13 +336,13 @@ export function TimelineBar({
                     const dx = curr.x - prev.x;
                     const dy = Math.abs(curr.y - prev.y);
                     
-                    // Base tension adjusted for better flow
-                    // Increased from 0.4 to 0.5 for smoother, more flowing curves
-                    let tension = 0.5;
+                    // Enhanced tension for smoother rollercoaster flow
+                    // Higher tension creates more flowing, natural curves
+                    let tension = 0.6;
                     
-                    // Reduce tension for large vertical changes to avoid overshooting
+                    // For large vertical changes, use moderate tension for dramatic but smooth swoops
                     if (dy > 50) {
-                      tension = 0.35;
+                      tension = 0.5;
                     }
                     
                     // Control point 1 (from previous point)
@@ -362,14 +353,14 @@ export function TimelineBar({
                     const cp2x = curr.x - dx * tension;
                     const cp2y = curr.y;
                     
-                    // Cubic Bézier curve for smooth flow
+                    // Cubic Bézier curve for smooth rollercoaster flow
                     path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
                   }
                   
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth="4"
+                strokeWidth="5"
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
