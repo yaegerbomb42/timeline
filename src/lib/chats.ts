@@ -42,6 +42,9 @@ export type BatchImportEntry = {
   content: string;
 };
 
+// Firestore batched write limit
+const FIRESTORE_BATCH_SIZE = 500;
+
 function makeExcerpt(text: string, max = 220) {
   const oneLine = text.replace(/\s+/g, " ").trim();
   if (oneLine.length <= max) return oneLine;
@@ -530,6 +533,8 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
   const snapshot = await getDocs(q);
   
   let deletedCount = 0;
+  let currentBatch = writeBatch(db);
+  let operationsInBatch = 0;
   const BATCH_SIZE = 500; // Firestore batch write limit
   let currentBatch: QueryDocumentSnapshot<DocumentData>[] = [];
   
@@ -554,6 +559,22 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
       // Continue with deletion even if archiving fails
     }
     
+    // Add deletion to batch
+    currentBatch.delete(docSnap.ref);
+    operationsInBatch++;
+    deletedCount++;
+    
+    // Commit batch if we've reached the limit
+    if (operationsInBatch >= FIRESTORE_BATCH_SIZE) {
+      await currentBatch.commit();
+      currentBatch = writeBatch(db);
+      operationsInBatch = 0;
+    }
+  }
+  
+  // Commit any remaining operations
+  if (operationsInBatch > 0) {
+    await currentBatch.commit();
     currentBatch.push(docSnap);
     
     // When batch is full, commit and start a new one
@@ -584,6 +605,22 @@ export async function bulkDeleteChats(uid: string, batchIds?: string[]): Promise
     const archiveSnap = await getDocs(archiveQuery);
     const toDelete = archiveSnap.docs.slice(30);
     
+    // Use batched deletes for archive cleanup too
+    let archiveBatch = writeBatch(db);
+    let archiveOps = 0;
+    
+    for (const docToDelete of toDelete) {
+      archiveBatch.delete(docToDelete.ref);
+      archiveOps++;
+      
+      if (archiveOps >= FIRESTORE_BATCH_SIZE) {
+        await archiveBatch.commit();
+        archiveBatch = writeBatch(db);
+        archiveOps = 0;
+      }
+    }
+    
+    if (archiveOps > 0) {
     // Also batch delete archives for efficiency
     if (toDelete.length > 0) {
       const archiveBatch = writeBatch(db);
