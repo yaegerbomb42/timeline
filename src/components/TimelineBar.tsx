@@ -3,7 +3,7 @@
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { useEffect, useMemo, memo } from "react";
+import { useMemo, memo } from "react";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
@@ -20,7 +20,27 @@ function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
 }
 
-// Glowing dot with particle trail and date label - Memoized for performance
+// Helper function to determine minimum slot width based on entry count
+function getMinSlotWidth(count: number): number {
+  if (count > 2000) return 8;
+  if (count > 1000) return 12;
+  if (count > 500) return 16;
+  return 20;
+}
+
+// Helper function to calculate label stride based on count and slot width
+function calculateLabelStride(count: number, slot: number): number {
+  if (count > 2000) return Math.max(100, Math.ceil(800 / slot));
+  if (count > 1000) return Math.max(60, Math.ceil(480 / slot));
+  if (count > 500) return Math.max(30, Math.ceil(240 / slot));
+  if (count > 200) return Math.max(15, Math.ceil(120 / slot));
+  return Math.max(5, Math.ceil(60 / slot));
+}
+
+// Minimum height for timeline container to ensure adequate space for rollercoaster visualization
+const MIN_TIMELINE_HEIGHT = 340;
+
+// Glowing dot with rating inside - Memoized for performance
 const GlowingDot = memo(function GlowingDot({
   chat,
   isNewest,
@@ -43,14 +63,7 @@ const GlowingDot = memo(function GlowingDot({
        'rgba(0,245,255,0.6)')
     : 'rgba(0,245,255,0.6)';
   
-  // Format date for display
-  const timeLabel = format(chat.createdAt, "h:mm a");
-  const fullDate = format(chat.createdAt, "MMM d, yyyy");
-  
-  // Label positioning constants - ROLLERCOASTER FLOW STYLE
-  // All labels positioned below the node for consistent rollercoaster flow appearance
-  const DATE_LABEL_OFFSET = 12; // Distance below the node for date label
-  const SENTIMENT_LABEL_OFFSET = 70; // Distance below the date for sentiment score
+  const rating = chat.moodAnalysis?.rating ?? 50;
     
   return (
     <div className="relative group/dot">
@@ -83,7 +96,7 @@ const GlowingDot = memo(function GlowingDot({
         whileHover={{ scale: 1.4, y: yOffset - 3 }}
         whileTap={{ scale: 0.9 }}
         className={cn(
-          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10 border-2",
+          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10 border-2 flex items-center justify-center",
         )}
         style={{
           width: size,
@@ -95,6 +108,16 @@ const GlowingDot = memo(function GlowingDot({
             : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
+        {/* Rating number inside circle */}
+        <span 
+          className="text-[9px] font-bold font-mono pointer-events-none"
+          style={{
+            color: 'rgba(255, 255, 255, 0.95)',
+            textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
+          }}
+        >
+          {rating}
+        </span>
         {isNewest && (
           <motion.div
             className="absolute inset-0 rounded-full"
@@ -109,65 +132,6 @@ const GlowingDot = memo(function GlowingDot({
           />
         )}
       </motion.button>
-      
-      {/* Date label - always below the node for consistent rollercoaster flow */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap transition-all duration-200"
-        style={{ 
-          top: `calc(100% + ${DATE_LABEL_OFFSET}px)`,
-          opacity: 1,
-        }}
-        aria-hidden="true"
-      >
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg shadow-lg group-hover/dot:scale-110 transition-transform duration-200"
-          style={{
-            background: `linear-gradient(135deg, ${moodColor}33, ${moodColor}22)`,
-            border: `1.5px solid ${moodColor}88`,
-            color: moodColor,
-            textShadow: `0 0 10px ${moodColor}aa`,
-            boxShadow: `0 2px 8px ${moodColor}44, 0 0 16px ${moodColor}22`,
-          }}
-        >
-          <div className="font-bold tracking-wide">{fullDate}</div>
-          <div className="opacity-80 text-[9px] mt-0.5">{timeLabel}</div>
-        </motion.div>
-      </div>
-      
-      {/* Sentiment score label - always below the date with emoji */}
-      {chat.moodAnalysis && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap transition-all duration-200"
-          style={{ 
-            top: `calc(100% + ${SENTIMENT_LABEL_OFFSET}px)`,
-            opacity: 1,
-          }}
-          aria-hidden="true"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="group-hover/dot:scale-125 transition-transform duration-200"
-          >
-            <div className="text-xl drop-shadow-lg mb-1 group-hover/dot:scale-110 transition-transform">{chat.moodAnalysis.emoji}</div>
-            <div 
-              className="text-[10px] font-mono font-bold px-2 py-1 rounded-md shadow-md"
-              style={{
-                background: `${moodColor}22`,
-                border: `1px solid ${moodColor}55`,
-                color: moodColor,
-                textShadow: `0 0 6px ${moodColor}88`,
-              }}
-            >
-              Score: {chat.moodAnalysis.rating}
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 });
@@ -197,42 +161,26 @@ export function TimelineBar({
     return entries;
   }, [groupedByDay]);
 
-  const { slotWidth, trackWidth, scrollable, labelStride } = useMemo(() => {
+  const { slotWidth, trackWidth, labelStride } = useMemo(() => {
     const width = viewportWidth || 0;
     const count = days.length || 1;
     
-    // Optimized spacing for large datasets (1600+ entries)
-    // Increase minimum slot width for better readability and spacing
-    const minSlot = count > 500 ? 28 : count > 200 ? 24 : 20;
-    const maxSlot = 100; // Increased max for better flow
+    // Ultra-compact spacing for high-density display
+    // Allow elements to be very close together - users will zoom to see detail
+    const minSlot = getMinSlotWidth(count);
+    const maxSlot = 60;
     const ideal = width > 0 ? width / count : minSlot;
     const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
-    const canScroll = width > 0 ? track > width + 1 : false;
     
-    // Adaptive label stride based on dataset size and slot width
-    // For large datasets, show fewer labels to reduce clutter
-    let stride;
-    if (count > 1000) {
-      stride = Math.max(30, Math.ceil(150 / slot));
-    } else if (count > 500) {
-      stride = Math.max(20, Math.ceil(120 / slot));
-    } else if (count > 200) {
-      stride = Math.max(10, Math.ceil(100 / slot));
-    } else {
-      stride = slot >= 40 ? Math.max(1, Math.ceil(60 / slot)) : Math.max(1, Math.ceil(80 / slot));
-    }
+    // Show date labels very sparingly to avoid clutter
+    const stride = calculateLabelStride(count, slot);
     
-    return { slotWidth: slot, trackWidth: track, scrollable: canScroll, labelStride: stride };
+    return { slotWidth: slot, trackWidth: track, labelStride: stride };
   }, [viewportWidth, days.length]);
 
-  // Auto-scroll to the newest side when the line overflows.
-  useEffect(() => {
-    if (!scrollable) return;
-    const el = viewportRef.current;
-    if (!el) return;
-    el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
-  }, [scrollable, newestChatId, viewportRef]);
+  // No auto-scroll - users can zoom/pan to navigate
+  // Removed auto-scroll to newest side to allow users to see full timeline
 
   const rangeLabel = useMemo(() => {
     if (days.length === 0) return "No entries yet";
@@ -267,6 +215,7 @@ export function TimelineBar({
             <>
               <Sparkles className="h-3 w-3 text-[var(--neon-purple)]" />
               {days.length} day{days.length === 1 ? "" : "s"}
+              <span className="text-[10px] opacity-90 ml-2 font-semibold">(pinch to zoom)</span>
             </>
           )}
         </motion.div>
@@ -277,22 +226,30 @@ export function TimelineBar({
         className={cn(
           "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
           "flex-1",
-          "overflow-x-auto overscroll-x-contain",
+          "overflow-hidden",
           "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
-          scrollable ? "pb-3" : "",
         )}
         style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
+          touchAction: 'pan-x pan-y pinch-zoom',
         }}
       >
         <div
-          className="relative min-h-[340px] h-full"
+          className="relative min-h-[340px] h-full overflow-auto"
           style={{
-            width: trackWidth,
-            minWidth: "100%",
+            minHeight: MIN_TIMELINE_HEIGHT,
+            width: '100%',
+            scrollbarWidth: "thin",
+            scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
           }}
         >
+          <div
+            className="relative h-full"
+            style={{
+              width: trackWidth,
+              minWidth: "100%",
+              transformOrigin: 'top left',
+            }}
+          >
           {/* Roller coaster path connecting the dots */}
           <svg 
             className="absolute inset-0 pointer-events-none" 
@@ -360,7 +317,7 @@ export function TimelineBar({
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth="5"
+                strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -400,7 +357,7 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const dotPx = Math.max(14, Math.min(22, 18)); // Slightly larger dots
+              const dotPx = Math.max(18, Math.min(26, 22)); // Larger dots for rating visibility
 
               return (
                 <motion.div
@@ -477,14 +434,15 @@ export function TimelineBar({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: idx * 0.05 + 0.2 }}
-                      className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[11px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
+                      className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
                     >
-                      {slotWidth >= 40 ? format(day.date, "MMM d") : format(day.date, "d")}
+                      {format(day.date, isNewMonth ? "MMM d" : "d")}
                     </motion.div>
                   ) : null}
                 </motion.div>
               );
             })}
+          </div>
           </div>
         </div>
       </div>
