@@ -65,8 +65,8 @@ Users can now:
 <span 
   className="text-[9px] font-bold font-mono pointer-events-none"
   style={{
-    color: 'rgba(0, 0, 0, 0.8)',
-    textShadow: `0 0 2px ${moodColor}`,
+    color: 'rgba(255, 255, 255, 0.95)',
+    textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
   }}
 >
   {rating}

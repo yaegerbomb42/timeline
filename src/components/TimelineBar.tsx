@@ -215,7 +215,7 @@ export function TimelineBar({
             <>
               <Sparkles className="h-3 w-3 text-[var(--neon-purple)]" />
               {days.length} day{days.length === 1 ? "" : "s"}
-              <span className="text-[10px] opacity-75 ml-2">(pinch to zoom)</span>
+              <span className="text-[10px] opacity-90 ml-2 font-semibold">(pinch to zoom)</span>
             </>
           )}
         </motion.div>
