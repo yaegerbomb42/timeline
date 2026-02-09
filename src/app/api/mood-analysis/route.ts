@@ -19,6 +19,8 @@ type MoodResult = {
   emoji: string;
   rationale: string;
   score: number;
+  geminiRationale: string;
+  consciousness: string;
 };
 
 type Body = {
@@ -37,9 +39,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing or invalid entries array." }, { status: 400 });
   }
 
-  // Limit batch size to 25 entries max (API limit, hook uses 15 for optimal balance)
-  if (body.entries.length > 25) {
-    return NextResponse.json({ error: "Maximum 25 entries per batch." }, { status: 400 });
+  // Limit batch size to 15 entries for optimal quality and context
+  // This ensures maximum context and quality over speed
+  if (body.entries.length > 15) {
+    return NextResponse.json({ error: "Maximum 15 entries per batch for quality analysis." }, { status: 400 });
   }
 
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
@@ -55,34 +58,48 @@ export async function POST(req: Request) {
     .map((e, idx) => `Entry ${idx + 1} (${e.date}):\n${e.text}`)
     .join("\n\n---\n\n");
 
-  const prompt = `You are an expert emotional intelligence analyst. Analyze the following journal entries and provide a mood rating for each one.
+  const prompt = `You are an expert emotional intelligence and consciousness analyst. Analyze the following journal entries with deep comprehension-based judging.
 
-For each entry, consider:
-- Overall emotional tone and sentiment
-- Language intensity and word choice
-- Context and subject matter (grandiose ideas about life, future plans, achievements = positive; complaints, problems, sadness = negative)
-- Enthusiasm and energy level in the writing
-- Hope, optimism, and forward-thinking = positive indicators
-- Dwelling on problems, negativity, or stress = negative indicators
+For each entry, provide:
+1. A sophisticated mood rating based on understanding context, subtext, and emotional nuance
+2. Detailed rationale explaining your reasoning (3-4 sentences minimum)
+3. A consciousness-level assessment with abbreviated summary
 
-Respond with a JSON array containing exactly ${body.entries.length} objects, one for each entry in order, with this structure:
+Consider:
+- Emotional tone, sentiment, and underlying feelings
+- Language patterns, word choice, and intensity
+- Self-awareness, introspection, and depth of thought
+- Context: life events, relationships, personal growth
+- Consciousness indicators:
+  * "observant text" - detailed external observations
+  * "self discovery" - introspective insights
+  * "overthinking reality" - philosophical rumination
+  * "found a girl/connection" - relationship/social connection
+  * "pessimistic" - negative outlook
+  * "hopeful" - optimistic forward-thinking
+  * "emotional processing" - working through feelings
+  * "creative expression" - artistic/creative thinking
+
+Respond with a JSON array containing exactly ${body.entries.length} objects, one for each entry in order:
 {
   "rating": <number 1-100>,
   "mood": "<positive|negative|neutral>",
-  "description": "<brief mood description>",
+  "description": "<sophisticated mood description>",
   "emoji": "<appropriate emoji>",
-  "rationale": "<2-3 sentence explanation>",
+  "rationale": "<3-4 sentence detailed explanation of mood reasoning>",
+  "geminiRationale": "<comprehensive analysis: explain emotional patterns, consciousness level, underlying themes, and contextual understanding - 4-5 sentences>",
+  "consciousness": "<abbreviated summary, e.g. 'observant text', 'self discovery', 'overthinking reality again', 'found a girl today', 'pessimistic', 'hopeful'>",
   "score": <number -15 to +15>
 }
 
-Rating scale:
-- 90-100: Ecstatic, thrilled, highly optimistic
-- 75-89: Happy, content, positive
-- 60-74: Upbeat, hopeful, mildly positive
-- 50-59: Neutral, balanced
-- 40-49: Slightly down, contemplative
-- 25-39: Stressed, anxious, disappointed
-- 10-24: Sad, depressed, struggling
+Rating scale (based on comprehensive understanding):
+- 90-100: Ecstatic, thrilled, highly optimistic, peak consciousness
+- 75-89: Happy, content, positive, good self-awareness
+- 60-74: Upbeat, hopeful, mildly positive, reflective
+- 50-59: Neutral, balanced, contemplative
+- 40-49: Slightly down, contemplative, introspective
+- 25-39: Stressed, anxious, disappointed, struggling
+- 10-24: Sad, depressed, emotionally burdened
 - 1-9: Devastated, heartbroken, severe distress
 
 ENTRIES:
@@ -168,6 +185,8 @@ Respond ONLY with the JSON array, no other text.`;
       description: result.description || "neutral",
       emoji: result.emoji || "😐",
       rationale: result.rationale || "No analysis available",
+      geminiRationale: result.geminiRationale || result.rationale || "No detailed analysis available",
+      consciousness: result.consciousness || "neutral observation",
       score: Math.max(-15, Math.min(15, result.score || 0)),
     }));
 

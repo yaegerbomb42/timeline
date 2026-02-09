@@ -11,6 +11,8 @@ export type MoodAnalysis = {
   emoji: string;
   score: number; // raw sentiment score
   rationale: string; // Detailed explanation of the rating
+  geminiRationale?: string; // Gemini AI's detailed reasoning (optional, added when Gemini analysis is used)
+  consciousness?: string; // Abbreviated summary of consciousness level (e.g., "observant text", "self discovery")
 };
 
 export function analyzeMood(text: string): Mood {

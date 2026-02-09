@@ -3,12 +3,13 @@
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { useMemo, memo } from "react";
+import { useMemo, memo, useState } from "react";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
 import { getMoodColor } from "@/lib/sentiment";
+import { MoodRationaleModal } from "@/components/MoodRationaleModal";
 
 type DayBucket = {
   dayKey: string; // yyyy-MM-dd
@@ -46,6 +47,7 @@ const GlowingDot = memo(function GlowingDot({
   isNewest,
   isHighlighted,
   onClick,
+  onShowRationale,
   size,
   yOffset,
 }: {
@@ -53,6 +55,7 @@ const GlowingDot = memo(function GlowingDot({
   isNewest?: boolean;
   isHighlighted?: boolean;
   onClick?: () => void;
+  onShowRationale?: () => void;
   size: number;
   yOffset: number;
 }) {
@@ -64,14 +67,28 @@ const GlowingDot = memo(function GlowingDot({
     : 'rgba(0,245,255,0.6)';
   
   const rating = chat.moodAnalysis?.rating ?? 50;
+  
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onShowRationale) {
+      onShowRationale();
+    }
+  };
     
   return (
     <div className="relative group/dot">
       <motion.button
         type="button"
-        onClick={onClick}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         aria-label={`${format(chat.createdAt, "MMMM d, yyyy 'at' h:mm a")}${chat.moodAnalysis ? `, Mood: ${chat.moodAnalysis.description}, Rating: ${chat.moodAnalysis.rating} out of 100` : ''}`}
-        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}`}
+        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}\n\nDouble-click for detailed analysis`}
         initial={{ opacity: 0, scale: 0.3, y: 10 }}
         animate={{
           opacity: 1,
@@ -148,6 +165,8 @@ export function TimelineBar({
   onSelectChat?: (chatId: string) => void;
 }) {
   const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [showRationaleModal, setShowRationaleModal] = useState(false);
 
   const days = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -419,6 +438,10 @@ export function TimelineBar({
                               isNewest={c.id === newestChatId}
                               isHighlighted={c.id === highlightChatId}
                               onClick={() => onSelectChat?.(c.id)}
+                              onShowRationale={() => {
+                                setSelectedChat(c);
+                                setShowRationaleModal(true);
+                              }}
                               size={dotPx}
                               yOffset={yOffset}
                             />
@@ -446,6 +469,13 @@ export function TimelineBar({
           </div>
         </div>
       </div>
+
+      {/* Mood Rationale Modal */}
+      <MoodRationaleModal
+        isOpen={showRationaleModal}
+        onClose={() => setShowRationaleModal(false)}
+        chat={selectedChat}
+      />
     </div>
   );
 }

@@ -847,7 +847,7 @@ export function AppShell() {
                 transition={{ delay: 0.45, duration: 0.6 }}
                 className="w-full"
               >
-                <AiPanel uid={user.uid} chats={chats} />
+                <AiPanel uid={user.uid} userEmail={user.email || user.displayName} chats={chats} />
               </motion.div>
             )}
 

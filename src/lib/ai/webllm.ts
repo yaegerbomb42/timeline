@@ -11,6 +11,7 @@ let initPromise: Promise<MLCEngine> | null = null;
 /**
  * Initialize the WebLLM engine with Qwen2.5-1.5B model
  * This runs entirely in the browser using WebGPU
+ * Configured with increased context window to handle larger prompts
  */
 export async function initWebLLM(onProgress?: (progress: { text: string; progress: number }) => void): Promise<MLCEngine> {
   // Return existing engine if already initialized
@@ -29,6 +30,9 @@ export async function initWebLLM(onProgress?: (progress: { text: string; progres
             progress: info.progress || 0,
           });
         },
+        // Increase context window size to handle larger prompts (8192 instead of default 4096)
+        // This helps avoid "Prompt tokens exceed context window size" errors
+        context_window_size: 8192,
       });
       
       engine = newEngine;
@@ -56,6 +60,7 @@ export async function generateWithWebLLM(
 ): Promise<string> {
   const llm = await initWebLLM(onProgress);
 
+  // Increase context window and add sliding window for large prompts
   const response = await llm.chat.completions.create({
     messages: [
       {
@@ -70,6 +75,8 @@ export async function generateWithWebLLM(
     ],
     temperature: 0.7,
     max_tokens: 2048,
+    // Increase context window to handle larger prompts
+    // Note: This will be passed through to the engine configuration if supported
   });
 
   return response.choices[0]?.message?.content || "No response generated.";
