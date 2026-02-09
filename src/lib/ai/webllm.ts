@@ -11,6 +11,8 @@ let initPromise: Promise<MLCEngine> | null = null;
 /**
  * Initialize the WebLLM engine with Qwen2.5-1.5B model
  * This runs entirely in the browser using WebGPU
+ * Note: Context window size is determined by the model (typically 32K for Qwen2.5)
+ * To handle large prompts, we should truncate context before sending to the model
  */
 export async function initWebLLM(onProgress?: (progress: { text: string; progress: number }) => void): Promise<MLCEngine> {
   // Return existing engine if already initialized
@@ -56,6 +58,16 @@ export async function generateWithWebLLM(
 ): Promise<string> {
   const llm = await initWebLLM(onProgress);
 
+  // Truncate context if it's too large to avoid exceeding context window
+  // Qwen2.5-1.5B typically has a 32K token context, but we'll be conservative
+  // Note: This is a rough estimate - actual token count varies significantly
+  // based on tokenizer and content complexity. We use ~2000 tokens as a safe limit.
+  const MAX_CONTEXT_CHARS = 8000; // Conservative estimate: ~2000 tokens
+  let truncatedContext = context;
+  if (context.length > MAX_CONTEXT_CHARS) {
+    truncatedContext = context.slice(0, MAX_CONTEXT_CHARS) + "\n\n[Context truncated for length...]";
+  }
+
   const response = await llm.chat.completions.create({
     messages: [
       {
@@ -65,7 +77,7 @@ export async function generateWithWebLLM(
       },
       {
         role: "user",
-        content: `TIMELINE CONTEXT:\n${context}\n\nUSER QUESTION: ${query}\n\nANSWER:`,
+        content: `TIMELINE CONTEXT:\n${truncatedContext}\n\nUSER QUESTION: ${query}\n\nANSWER:`,
       },
     ],
     temperature: 0.7,

@@ -54,9 +54,11 @@ function HolographicText({ children, className }: { children: React.ReactNode; c
 
 export function AiPanel({
   uid,
+  userEmail,
   chats,
 }: {
   uid: string;
+  userEmail?: string | null;
   chats: Chat[];
 }) {
   const { months } = useMonthIndex(uid);
@@ -86,10 +88,13 @@ export function AiPanel({
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when chat history updates
+  // Auto-scroll to bottom when chat history updates - ONLY when assistant responds, NOT on user input
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory, busy]);
+    // Only scroll if the last message is from assistant (bot responded)
+    if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1]?.role === "assistant") {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatHistory]);
 
   // Check if WebGPU is available for WebLLM
   const webGPUAvailable = useMemo(() => isWebGPUAvailable(), []);
@@ -276,7 +281,7 @@ export function AiPanel({
                   ⚠️ WebGPU is not available in your browser. Local AI mode is disabled. Please use Pro mode with your Gemini API key.
                 </div>
               )}
-              Enter your Gemini API key for <span className="font-mono text-[var(--electric-blue)]">{uid}</span> to use Pro mode.
+              Enter your Gemini API key{userEmail ? ` for ${userEmail}` : ''} to use Pro mode.
               {webGPUAvailable && <> Or switch to Local mode to use WebLLM (no API key needed).</>}
             </div>
 

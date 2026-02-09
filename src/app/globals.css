@@ -146,3 +146,37 @@ body::after {
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--cool-violet), var(--soft-coral));
 }
+
+/* Zoom slider custom styling */
+.zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+  cursor: pointer;
+  border: 2px solid var(--bg-deep);
+  box-shadow: 0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple);
+  transition: all 0.2s ease;
+}
+
+.zoom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-purple);
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+  cursor: pointer;
+  border: 2px solid var(--bg-deep);
+  box-shadow: 0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple);
+  transition: all 0.2s ease;
+}
+
+.zoom-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-purple);
+}

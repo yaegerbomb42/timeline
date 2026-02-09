@@ -3,16 +3,13 @@
 import { format, parse } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles } from "lucide-react";
-import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMemo, memo, useState } from "react";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
 import { getMoodColor } from "@/lib/sentiment";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
-import { ZoomSlider } from "@/components/ZoomSlider";
-import { Minimap } from "@/components/Minimap";
 
 type DayBucket = {
   dayKey: string; // yyyy-MM-dd
@@ -168,14 +165,8 @@ export function TimelineBar({
   onSelectChat?: (chatId: string) => void;
 }) {
   const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [showRationaleModal, setShowRationaleModal] = useState(false);
-  
-  // Zoom state management
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const MIN_ZOOM = 1;
-  const MAX_ZOOM = 10;
 
   const days = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -189,152 +180,23 @@ export function TimelineBar({
     return entries;
   }, [groupedByDay]);
 
-  // Calculate slot width based on zoom level
   const { slotWidth, trackWidth, labelStride } = useMemo(() => {
     const width = viewportWidth || 0;
     const count = days.length || 1;
     
-    // Base slot width calculation
+    // Ultra-compact spacing for high-density display
+    // Allow elements to be very close together - users will zoom to see detail
     const minSlot = getMinSlotWidth(count);
-    const maxSlot = 200; // Increased for higher zoom
-    
-    // Apply zoom multiplier
-    const baseSlot = Math.max(minSlot, 20);
-    const slot = Math.min(maxSlot, baseSlot * zoomLevel);
+    const maxSlot = 60;
+    const ideal = width > 0 ? width / count : minSlot;
+    const slot = Math.max(minSlot, Math.min(maxSlot, ideal));
     const track = slot * count;
     
-    // Adjust label stride based on zoom
+    // Show date labels very sparingly to avoid clutter
     const stride = calculateLabelStride(count, slot);
     
     return { slotWidth: slot, trackWidth: track, labelStride: stride };
-  }, [viewportWidth, days.length, zoomLevel]);
-
-  // Setup virtualizer for horizontal scrolling
-  const virtualizer = useVirtualizer({
-    count: days.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => slotWidth,
-    horizontal: true,
-    overscan: 50, // Render 50 items before/after visible range
-  });
-
-  const virtualItems = virtualizer.getVirtualItems();
-  
-  // Calculate visible range for minimap
-  const visibleStartIdx = virtualItems[0]?.index || 0;
-  const visibleEndIdx = virtualItems[virtualItems.length - 1]?.index || days.length - 1;
-  
-  // Calculate visible days count for zoom slider
-  const visibleDaysCount = visibleEndIdx - visibleStartIdx + 1;
-
-  // Density map for minimap
-  const densityMap = useMemo(() => {
-    const map = new Map<number, number>();
-    days.forEach((day, idx) => {
-      map.set(idx, day.chats.length);
-    });
-    return map;
-  }, [days]);
-
-  // Handle zoom change
-  const handleZoomChange = useCallback((newZoom: number) => {
-    const scrollElement = scrollContainerRef.current;
-    if (!scrollElement) {
-      setZoomLevel(newZoom);
-      return;
-    }
-    
-    // Calculate center point before zoom
-    const scrollLeft = scrollElement.scrollLeft;
-    const viewportCenter = scrollLeft + (viewportWidth / 2);
-    const centerRatio = viewportCenter / (trackWidth || 1);
-    
-    // Update zoom
-    setZoomLevel(newZoom);
-    
-    // After zoom, restore center point (done in useEffect)
-    requestAnimationFrame(() => {
-      const newTrackWidth = slotWidth * days.length;
-      const newCenter = centerRatio * newTrackWidth;
-      const newScrollLeft = newCenter - (viewportWidth / 2);
-      scrollElement.scrollLeft = Math.max(0, newScrollLeft);
-    });
-  }, [viewportWidth, trackWidth, slotWidth, days.length]);
-
-  // Handle minimap view window change
-  const handleMinimapChange = useCallback((startIdx: number, endIdx: number) => {
-    const scrollElement = scrollContainerRef.current;
-    if (!scrollElement) return;
-    
-    // Calculate scroll position to show the selected range
-    const scrollLeft = startIdx * slotWidth;
-    scrollElement.scrollLeft = scrollLeft;
-    
-    // Optionally adjust zoom to fit the range
-    const requestedDays = endIdx - startIdx;
-    const currentVisibleDays = viewportWidth / slotWidth;
-    if (requestedDays > 0 && currentVisibleDays > 0) {
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (currentVisibleDays / requestedDays)));
-      setZoomLevel(newZoom);
-    }
-  }, [slotWidth, viewportWidth, zoomLevel, MIN_ZOOM, MAX_ZOOM]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          handleZoomChange(Math.min(MAX_ZOOM, zoomLevel + 0.5));
-        } else if (e.key === '-') {
-          e.preventDefault();
-          handleZoomChange(Math.max(MIN_ZOOM, zoomLevel - 0.5));
-        } else if (e.key === '0') {
-          e.preventDefault();
-          setZoomLevel(1);
-        }
-      }
-      
-      const scrollElement = scrollContainerRef.current;
-      if (!scrollElement) return;
-      
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        scrollElement.scrollLeft -= slotWidth * 5;
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        scrollElement.scrollLeft += slotWidth * 5;
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        scrollElement.scrollLeft = 0;
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        scrollElement.scrollLeft = scrollElement.scrollWidth;
-      }
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.2 : 0.2;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + delta));
-        handleZoomChange(newZoom);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    const scrollElement = scrollContainerRef.current;
-    if (scrollElement) {
-      scrollElement.addEventListener('wheel', handleWheel, { passive: false });
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (scrollElement) {
-        scrollElement.removeEventListener('wheel', handleWheel);
-      }
-    };
-  }, [zoomLevel, slotWidth, handleZoomChange, MIN_ZOOM, MAX_ZOOM]);
+  }, [viewportWidth, days.length]);
 
   // No auto-scroll - users can zoom/pan to navigate
   // Removed auto-scroll to newest side to allow users to see full timeline
@@ -391,7 +253,6 @@ export function TimelineBar({
         }}
       >
         <div
-          ref={scrollContainerRef}
           className="relative min-h-[340px] h-full overflow-auto"
           style={{
             minHeight: MIN_TIMELINE_HEIGHT,
@@ -403,7 +264,7 @@ export function TimelineBar({
           <div
             className="relative h-full"
             style={{
-              width: virtualizer.getTotalSize(),
+              width: trackWidth,
               minWidth: "100%",
               transformOrigin: 'top left',
             }}
@@ -501,12 +362,8 @@ export function TimelineBar({
             transition={{ duration: 3, repeat: Infinity }}
           />
 
-          <div className="flex h-full items-end absolute left-0 top-0">
-            {virtualItems.map((virtualItem) => {
-              const idx = virtualItem.index;
-              const day = days[idx];
-              if (!day) return null;
-
+          <div className="flex h-full items-end">
+            {days.map((day, idx) => {
               const prevMonth = idx > 0 ? format(days[idx - 1]!.date, "yyyy-MM") : null;
               const thisMonth = format(day.date, "yyyy-MM");
               const isNewMonth = prevMonth !== thisMonth;
@@ -525,14 +382,9 @@ export function TimelineBar({
                   key={day.dayKey}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0, duration: 0.3 }}
+                  transition={{ delay: idx * 0.05, duration: 0.5 }}
                   className="relative h-full group"
-                  style={{ 
-                    width: virtualItem.size, 
-                    position: 'absolute',
-                    left: virtualItem.start,
-                    top: 0,
-                  }}
+                  style={{ width: slotWidth, flex: `0 0 ${slotWidth}px` }}
                 >
                   {/* Month label with glow */}
                   {isNewMonth ? (
@@ -641,27 +493,6 @@ export function TimelineBar({
           </div>
         </div>
       </div>
-
-      {/* Zoom Slider */}
-      <ZoomSlider
-        zoomLevel={zoomLevel}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        onZoomChange={handleZoomChange}
-        visibleDaysCount={visibleDaysCount}
-        totalDays={days.length}
-      />
-
-      {/* Minimap */}
-      <Minimap
-        totalDays={days.length}
-        densityMap={densityMap}
-        visibleStartIdx={visibleStartIdx}
-        visibleEndIdx={visibleEndIdx}
-        onViewWindowChange={handleMinimapChange}
-        startDate={days[0]?.date}
-        endDate={days[days.length - 1]?.date}
-      />
 
       {/* Mood Rationale Modal */}
       <MoodRationaleModal
