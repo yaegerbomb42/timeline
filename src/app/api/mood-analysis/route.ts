@@ -74,7 +74,7 @@ Consider:
   * "observant text" - detailed external observations
   * "self discovery" - introspective insights
   * "overthinking reality" - philosophical rumination
-  * "found a girl/connection" - relationship/social connection
+  * "social connection" - relationship/connection experiences
   * "pessimistic" - negative outlook
   * "hopeful" - optimistic forward-thinking
   * "emotional processing" - working through feelings
@@ -88,7 +88,7 @@ Respond with a JSON array containing exactly ${body.entries.length} objects, one
   "emoji": "<appropriate emoji>",
   "rationale": "<3-4 sentence detailed explanation of mood reasoning>",
   "geminiRationale": "<comprehensive analysis: explain emotional patterns, consciousness level, underlying themes, and contextual understanding - 4-5 sentences>",
-  "consciousness": "<abbreviated summary, e.g. 'observant text', 'self discovery', 'overthinking reality again', 'found a girl today', 'pessimistic', 'hopeful'>",
+  "consciousness": "<abbreviated summary, e.g. 'observant text', 'self discovery', 'overthinking reality again', 'social connection', 'pessimistic', 'hopeful'>",
   "score": <number -15 to +15>
 }
 

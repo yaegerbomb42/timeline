@@ -60,7 +60,9 @@ export async function generateWithWebLLM(
 
   // Truncate context if it's too large to avoid exceeding context window
   // Qwen2.5-1.5B typically has a 32K token context, but we'll be conservative
-  const MAX_CONTEXT_CHARS = 8000; // Approximately 2000 tokens
+  // Note: This is a rough estimate - actual token count varies significantly
+  // based on tokenizer and content complexity. We use ~2000 tokens as a safe limit.
+  const MAX_CONTEXT_CHARS = 8000; // Conservative estimate: ~2000 tokens
   let truncatedContext = context;
   if (context.length > MAX_CONTEXT_CHARS) {
     truncatedContext = context.slice(0, MAX_CONTEXT_CHARS) + "\n\n[Context truncated for length...]";
