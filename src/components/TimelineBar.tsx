@@ -284,23 +284,24 @@ export function TimelineBar({
             {days.length > 1 && (
               <motion.path
                 d={(() => {
-                  const points = days.flatMap((day, idx) => {
+                  // For rollercoaster path, use one point per day with averaged mood
+                  const points = days.map((day, idx) => {
                     const x = idx * slotWidth + slotWidth / 2;
-                    return day.chats.map((chat) => {
-                      // Calculate Y position based on mood rating (1-100)
-                      // Canvas coordinates: lower Y = top of screen, higher Y = bottom of screen
-                      // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
-                      // This creates the "rollercoaster" effect with happy moments at peaks
-                      const rating = chat.moodAnalysis?.rating ?? 50;
-                      const y = 230 - ((rating - 1) / 99) * 200;
-                      return { x, y };
-                    });
+                    // Calculate average rating for the day
+                    const ratings = day.chats
+                      .map(c => c.moodAnalysis?.rating ?? 50)
+                      .filter(r => r !== null);
+                    const avgRating = ratings.length > 0 
+                      ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+                      : 50;
+                    // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
+                    const y = 230 - ((avgRating - 1) / 99) * 200;
+                    return { x, y };
                   });
                   
                   if (points.length < 2) return '';
                   
                   // Create smooth cubic Bézier curve through points for flowing line
-                  // Improved smoothing with adaptive tension based on distance
                   let path = `M ${points[0]!.x} ${points[0]!.y}`;
                   
                   for (let i = 1; i < points.length; i++) {
@@ -308,12 +309,10 @@ export function TimelineBar({
                     const curr = points[i]!;
                     
                     // Calculate control points for smooth curve
-                    // Adaptive tension: smoother for close points, tighter for distant points
                     const dx = curr.x - prev.x;
                     const dy = Math.abs(curr.y - prev.y);
                     
                     // Enhanced tension for smoother rollercoaster flow
-                    // Higher tension creates more flowing, natural curves
                     let tension = 0.6;
                     
                     // For large vertical changes, use moderate tension for dramatic but smooth swoops
@@ -417,29 +416,54 @@ export function TimelineBar({
                   />
 
                   {/* Marks positioned by mood rating for roller coaster effect */}
+                  {/* Show ONE aggregated node per day with average mood */}
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full h-full">
                     <AnimatePresence initial={false}>
-                      {marks.map((c) => {
-                        // Calculate Y offset based on mood rating (1-100)
-                        // Canvas coordinates: lower Y = top, higher Y = bottom
-                        // Rating 1 (sad) -> bottom, Rating 100 (happy) -> top
-                        // Adjusted to match the path calculation for perfect alignment
-                        const rating = c.moodAnalysis?.rating ?? 50;
-                        const yOffset = -30 - ((rating - 1) / 99) * 200;
+                      {(() => {
+                        // Calculate average rating for this day
+                        const ratings = marks
+                          .map(c => c.moodAnalysis?.rating ?? 50)
+                          .filter(r => r !== null);
+                        const avgRating = ratings.length > 0 
+                          ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
+                          : 50;
+                        
+                        // Use the first chat for the day as representative (for ID and click handling)
+                        const representativeChat = marks[0]!;
+                        
+                        // Calculate Y offset based on average mood rating
+                        const yOffset = -30 - ((avgRating - 1) / 99) * 200;
+                        
+                        // Create a synthetic chat object with averaged mood for display
+                        const avgChat = {
+                          ...representativeChat,
+                          moodAnalysis: representativeChat.moodAnalysis ? {
+                            ...representativeChat.moodAnalysis,
+                            rating: avgRating,
+                            description: marks.length > 1 
+                              ? `${marks.length} entries (avg)` 
+                              : representativeChat.moodAnalysis.description,
+                          } : undefined
+                        };
                         
                         return (
                           <div
-                            key={c.id}
+                            key={day.dayKey}
                             className="absolute left-1/2 -translate-x-1/2"
                             style={{ bottom: '32px' }}
                           >
                             <GlowingDot
-                              chat={c}
-                              isNewest={c.id === newestChatId}
-                              isHighlighted={c.id === highlightChatId}
-                              onClick={() => onSelectChat?.(c.id)}
+                              chat={avgChat}
+                              isNewest={marks.some(c => c.id === newestChatId)}
+                              isHighlighted={marks.some(c => c.id === highlightChatId)}
+                              onClick={() => {
+                                // When clicked, select the first chat of the day
+                                // (could be enhanced to show all chats for the day)
+                                onSelectChat?.(representativeChat.id);
+                              }}
                               onShowRationale={() => {
-                                setSelectedChat(c);
+                                // Show rationale for the first chat of the day
+                                setSelectedChat(representativeChat);
                                 setShowRationaleModal(true);
                               }}
                               size={dotPx}
@@ -447,7 +471,7 @@ export function TimelineBar({
                             />
                           </div>
                         );
-                      })}
+                      })()}
                     </AnimatePresence>
                   </div>
 
