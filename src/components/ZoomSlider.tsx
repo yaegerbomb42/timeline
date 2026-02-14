@@ -114,7 +114,7 @@ export function ZoomSlider({
       </div>
 
       {/* Visible Range Display - always visible */}
-      {visibleDaysCount != null && totalDays != null && totalDays > 0 && (
+      {visibleDaysCount !== undefined && totalDays !== undefined && totalDays > 0 && (
         <div className="flex items-center gap-1.5 min-w-[100px]">
           <span className="text-xs font-mono font-semibold text-[var(--neon-cyan)] whitespace-nowrap">
             {getVisibleRangeText()}

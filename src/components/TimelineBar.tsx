@@ -50,6 +50,11 @@ const COASTER_TOP = 50;     // y for rating 100 (top of coaster)
 const COASTER_BOTTOM = 280;  // y for rating 1 (bottom of coaster)
 const COASTER_RANGE = COASTER_BOTTOM - COASTER_TOP;
 
+// Bézier curve tension for smooth rollercoaster flow
+const CURVE_TENSION_DEFAULT = 0.6;  // Standard horizontal control point ratio
+const CURVE_TENSION_STEEP = 0.5;    // For large vertical mood changes (>50px)
+const STEEP_THRESHOLD = 50;          // Y-distance threshold for reduced tension
+
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
   return COASTER_BOTTOM - ((rating - 1) / 99) * COASTER_RANGE;
@@ -489,7 +494,7 @@ export function TimelineBar({
                     const dy = Math.abs(curr.y - prev.y);
                     
                     // Smooth tension for flowing rollercoaster line
-                    const tension = dy > 50 ? 0.5 : 0.6;
+                    const tension = dy > STEEP_THRESHOLD ? CURVE_TENSION_STEEP : CURVE_TENSION_DEFAULT;
                     
                     const cp1x = prev.x + dx * tension;
                     const cp1y = prev.y;
