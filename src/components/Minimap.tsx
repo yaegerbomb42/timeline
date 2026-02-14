@@ -30,8 +30,29 @@ export function Minimap({
   const [dragStart, setDragStart] = useState({ x: 0, startIdx: 0, endIdx: 0 });
 
   const width = containerRef.current?.clientWidth || 0;
-  const viewWindowLeft = (visibleStartIdx / totalDays) * width;
-  const viewWindowWidth = ((visibleEndIdx - visibleStartIdx) / totalDays) * width;
+  const viewWindowLeft = totalDays > 0 ? (visibleStartIdx / totalDays) * width : 0;
+  const viewWindowWidth = totalDays > 0 ? ((visibleEndIdx - visibleStartIdx) / totalDays) * width : 0;
+  
+  // Calculate visible range for display
+  const getVisibleRangeText = () => {
+    if (!startDate || !endDate || totalDays === 0) return "";
+    const visibleDays = visibleEndIdx - visibleStartIdx;
+    if (visibleDays >= totalDays) return "Entire timeline";
+    
+    if (visibleDays === 1) return "1 day";
+    if (visibleDays < 7) return `${visibleDays} days`;
+    if (visibleDays < 30) {
+      const weeks = Math.round(visibleDays / 7);
+      return `~${weeks} week${weeks > 1 ? 's' : ''}`;
+    }
+    if (visibleDays < 365) {
+      const months = Math.round(visibleDays / 30);
+      return `~${months} month${months > 1 ? 's' : ''}`;
+    }
+    const years = (visibleDays / 365).toFixed(1);
+    const yearsFloat = parseFloat(years);
+    return `~${years} year${yearsFloat > 1 ? 's' : ''}`;
+  };
 
   // Get max density for normalization
   const maxDensity = Math.max(...Array.from(densityMap.values()), 1);
@@ -165,81 +186,95 @@ export function Minimap({
             </div>
           )}
         </div>
-        <div className="text-[10px] font-mono text-[var(--text-muted)]">
-          {totalDays} day{totalDays !== 1 ? 's' : ''}
+        <div className="flex items-center gap-3">
+          <div className="text-[10px] font-mono text-[var(--text-muted)]">
+            {totalDays} day{totalDays !== 1 ? 's' : ''}
+          </div>
+          {getVisibleRangeText() && (
+            <div className="text-[10px] font-mono text-[var(--neon-cyan)] font-semibold">
+              Viewing: {getVisibleRangeText()}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Minimap Container */}
       <div
         ref={containerRef}
-        className="relative h-16 rounded-xl bg-[var(--bg-elevated)]/60 border border-[var(--line)] overflow-hidden cursor-pointer"
+        className="relative h-20 rounded-xl bg-[var(--bg-elevated)]/60 border border-[var(--line)] overflow-hidden cursor-pointer"
         onClick={handleMinimapClick}
       >
         {/* Density visualization */}
         <div className="absolute inset-0 flex items-end">
-          {Array.from({ length: Math.min(totalDays, 200) }).map((_, idx) => {
-            const dayIdx = Math.floor((idx / 200) * totalDays);
-            const density = densityMap.get(dayIdx) || 0;
-            const height = Math.max(2, (density / maxDensity) * 100);
-            
-            return (
-              <div
-                key={idx}
-                className="flex-1 transition-all"
-                style={{
-                  height: `${height}%`,
-                  background: density > 0 
-                    ? `linear-gradient(to top, var(--neon-cyan), var(--neon-purple))`
-                    : 'transparent',
-                  opacity: 0.6,
-                }}
-              />
-            );
-          })}
+          {totalDays > 0 && (() => {
+            const barCount = Math.min(totalDays, 300);
+            return Array.from({ length: barCount }).map((_, idx) => {
+              // Avoid division by zero
+              const dayIdx = Math.floor((idx / barCount) * totalDays);
+              const density = densityMap.get(dayIdx) || 0;
+              const height = Math.max(4, (density / maxDensity) * 100);
+              
+              return (
+                <div
+                  key={idx}
+                  className="flex-1 transition-all"
+                  style={{
+                    height: `${height}%`,
+                    background: density > 0 
+                      ? `linear-gradient(to top, rgba(0, 245, 255, 0.7), rgba(168, 85, 247, 0.7))`
+                      : 'transparent',
+                    opacity: 0.8,
+                    minWidth: '1px',
+                  }}
+                />
+              );
+            });
+          })()}
         </div>
 
         {/* View window rectangle */}
-        <motion.div
-          className={cn(
-            "absolute top-0 bottom-0 rounded-lg border-2",
-            "bg-[var(--neon-cyan)]/10 backdrop-blur-sm",
-            isDragging || isResizing
-              ? "border-[var(--neon-purple)] shadow-[0_0_20px_var(--glow-purple)]"
-              : "border-[var(--neon-cyan)] shadow-[0_0_15px_var(--glow-cyan)]",
-            "transition-all duration-200"
-          )}
-          style={{
-            left: viewWindowLeft,
-            width: viewWindowWidth,
-            cursor: isDragging ? 'grabbing' : 'grab',
-          }}
-          onMouseDown={(e) => handleMouseDown(e, 'drag')}
-        >
-          {/* Left resize handle */}
-          <div
+        {width > 0 && viewWindowWidth > 0 && (
+          <motion.div
             className={cn(
-              "absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize",
-              "hover:bg-[var(--neon-cyan)]/20 transition-colors",
-              "flex items-center justify-center"
+              "absolute top-0 bottom-0 rounded-lg border-2",
+              "bg-[var(--neon-cyan)]/15 backdrop-blur-sm",
+              isDragging || isResizing
+                ? "border-[var(--neon-purple)] shadow-[0_0_20px_var(--glow-purple)]"
+                : "border-[var(--neon-cyan)] shadow-[0_0_15px_var(--glow-cyan)]",
+              "transition-all duration-200"
             )}
-            onMouseDown={(e) => handleMouseDown(e, 'resize-left')}
+            style={{
+              left: Math.max(0, viewWindowLeft),
+              width: Math.max(20, Math.min(viewWindowWidth, width - viewWindowLeft)),
+              cursor: isDragging ? 'grabbing' : 'grab',
+            }}
+            onMouseDown={(e) => handleMouseDown(e, 'drag')}
           >
-            <div className="w-0.5 h-6 bg-[var(--neon-cyan)] rounded-full" />
-          </div>
+            {/* Left resize handle */}
+            <div
+              className={cn(
+                "absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize",
+                "hover:bg-[var(--neon-cyan)]/30 transition-colors",
+                "flex items-center justify-center"
+              )}
+              onMouseDown={(e) => handleMouseDown(e, 'resize-left')}
+            >
+              <div className="w-1 h-8 bg-[var(--neon-cyan)] rounded-full shadow-[0_0_8px_var(--glow-cyan)]" />
+            </div>
 
-          {/* Right resize handle */}
-          <div
-            className={cn(
-              "absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize",
-              "hover:bg-[var(--neon-cyan)]/20 transition-colors",
-              "flex items-center justify-center"
-            )}
-            onMouseDown={(e) => handleMouseDown(e, 'resize-right')}
-          >
-            <div className="w-0.5 h-6 bg-[var(--neon-cyan)] rounded-full" />
-          </div>
-        </motion.div>
+            {/* Right resize handle */}
+            <div
+              className={cn(
+                "absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize",
+                "hover:bg-[var(--neon-cyan)]/30 transition-colors",
+                "flex items-center justify-center"
+              )}
+              onMouseDown={(e) => handleMouseDown(e, 'resize-right')}
+            >
+              <div className="w-1 h-8 bg-[var(--neon-cyan)] rounded-full shadow-[0_0_8px_var(--glow-cyan)]" />
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Instructions */}

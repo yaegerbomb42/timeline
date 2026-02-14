@@ -414,10 +414,37 @@ export function TimelineBar({
             style={{ width: '100%', height: '100%' }}
           >
             <defs>
+              {/* Sentiment-based gradient: Red (negative) -> Yellow (neutral) -> Green (positive) */}
               <linearGradient id="rollercoaster-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="var(--neon-cyan)" stopOpacity="0.6" />
-                <stop offset="50%" stopColor="var(--neon-purple)" stopOpacity="0.6" />
-                <stop offset="100%" stopColor="var(--neon-pink)" stopOpacity="0.6" />
+                {days.map((day, idx) => {
+                  // Calculate average rating for the day
+                  const ratings = day.chats
+                    .map(c => c.moodAnalysis?.rating ?? 50)
+                    .filter(r => r !== null);
+                  const avgRating = ratings.length > 0 
+                    ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+                    : 50;
+                  
+                  // Convert rating to color: Red (negative) -> Yellow (neutral) -> Green (positive)
+                  let color: string;
+                  if (avgRating < 40) {
+                    // Negative: Red with intensity based on how low the rating is
+                    const intensity = (40 - avgRating) / 40;
+                    color = `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
+                  } else if (avgRating > 60) {
+                    // Positive: Green with intensity based on how high the rating is
+                    const intensity = (avgRating - 60) / 40;
+                    color = `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
+                  } else {
+                    // Neutral: Yellow/Orange gradient
+                    const neutralPos = (avgRating - 40) / 20;
+                    color = `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
+                  }
+                  
+                  // Avoid division by zero for single day (use 0% for single color fill)
+                  const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "0%";
+                  return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="0.8" />;
+                })}
               </linearGradient>
             </defs>
             {days.length > 1 && (
@@ -482,7 +509,7 @@ export function TimelineBar({
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 2, ease: "easeInOut" }}
                 style={{
-                  filter: 'drop-shadow(0 0 16px var(--glow-cyan)) drop-shadow(0 0 8px var(--glow-purple))',
+                  filter: 'drop-shadow(0 0 16px rgba(255, 200, 100, 0.6)) drop-shadow(0 0 8px rgba(100, 255, 136, 0.6))',
                 }}
               />
             )}

@@ -632,8 +632,42 @@ export async function getBatchEntryCounts(uid: string): Promise<Map<string, numb
 }
 
 /**
+ * Recalculate mood ratings for all existing entries using Gemini AI
+ * This is meant to be called from the mood analysis queue which handles batching
+ * @param uid User ID
+ * @param onProgress Progress callback
+ * @returns Number of entries that needed updating (for queue to process)
+ */
+export async function recalculateMoodRatingsWithGemini(uid: string, onProgress?: (current: number, total: number) => void): Promise<number> {
+  const q = query(collection(db, "users", uid, "chats"));
+  const snapshot = await getDocs(q);
+  
+  let needsUpdate = 0;
+  const total = snapshot.docs.length;
+  
+  for (let i = 0; i < snapshot.docs.length; i++) {
+    const docSnap = snapshot.docs[i];
+    if (!docSnap) continue;
+    
+    const data = docSnap.data();
+    
+    // Count entries that need Gemini analysis (missing geminiRationale or consciousness)
+    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+      needsUpdate++;
+    }
+    
+    if (onProgress) {
+      onProgress(i + 1, total);
+    }
+  }
+  
+  return needsUpdate;
+}
+
+/**
  * Recalculate mood ratings for all existing entries that don't have them
  * This ensures all entries have mood analysis, even those created before the feature
+ * Uses basic sentiment analysis (not Gemini)
  */
 export async function recalculateMoodRatings(uid: string, onProgress?: (current: number, total: number) => void): Promise<number> {
   const q = query(collection(db, "users", uid, "chats"));
@@ -643,7 +677,9 @@ export async function recalculateMoodRatings(uid: string, onProgress?: (current:
   const total = snapshot.docs.length;
   
   for (let i = 0; i < snapshot.docs.length; i++) {
-    const docSnap = snapshot.docs[i]!;
+    const docSnap = snapshot.docs[i];
+    if (!docSnap) continue;
+    
     const data = docSnap.data();
     
     // Update if mood analysis is missing OR if rationale field is missing
