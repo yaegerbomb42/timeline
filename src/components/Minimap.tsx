@@ -50,7 +50,8 @@ export function Minimap({
       return `~${months} month${months > 1 ? 's' : ''}`;
     }
     const years = (visibleDays / 365).toFixed(1);
-    return `~${years} year${parseFloat(years) !== 1.0 ? 's' : ''}`;
+    const yearsFloat = parseFloat(years);
+    return `~${years} year${yearsFloat > 1 ? 's' : ''}`;
   };
 
   // Get max density for normalization
