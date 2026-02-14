@@ -461,7 +461,7 @@ export function TimelineBar({
                       : 50;
                     // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
                     const y = 230 - ((avgRating - 1) / 99) * 200;
-                    return { x, y, rating: avgRating };
+                    return { x, y };
                   });
                   
                   if (points.length < 2) return '';
