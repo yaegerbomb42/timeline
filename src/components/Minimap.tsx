@@ -206,7 +206,9 @@ export function Minimap({
         {/* Density visualization */}
         <div className="absolute inset-0 flex items-end">
           {totalDays > 0 && Array.from({ length: Math.min(totalDays, 300) }).map((_, idx) => {
-            const dayIdx = Math.floor((idx / Math.min(totalDays, 300)) * totalDays);
+            // Avoid division by zero
+            const divisor = Math.max(1, Math.min(totalDays, 300));
+            const dayIdx = Math.floor((idx / divisor) * totalDays);
             const density = densityMap.get(dayIdx) || 0;
             const height = Math.max(4, (density / maxDensity) * 100);
             

@@ -28,7 +28,7 @@ color = rgb(
 **Examples:**
 - Rating 40 → intensity=0.0 → rgb(255, 100, 100) - Light pink/red
 - Rating 20 → intensity=0.5 → rgb(255, 50, 50) - Medium red
-- Rating 1 → intensity=0.975 → rgb(255, 3, 3) - Nearly pure red (most negative)
+- Rating 1 → intensity=0.975 → rgb(255, Math.round(100*0.025), Math.round(100*0.025)) → rgb(255, 3, 3) - Nearly pure red (most negative)
 
 #### Neutral Range (Rating 40-60)
 ```javascript

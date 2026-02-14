@@ -441,7 +441,8 @@ export function TimelineBar({
                     color = `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
                   }
                   
-                  const offset = `${(idx / (days.length - 1)) * 100}%`;
+                  // Avoid division by zero for single day
+                  const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "50%";
                   return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="0.8" />;
                 })}
               </linearGradient>
