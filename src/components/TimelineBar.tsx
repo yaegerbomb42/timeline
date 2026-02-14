@@ -4,6 +4,7 @@ import { format, parse, isAfter, isBefore, startOfDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
+import Image from "next/image";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
@@ -854,10 +855,12 @@ export function TimelineBar({
                                   height: dotPx,
                                 }}
                               >
-                                <img
+                                <Image
                                   src={representativeChat.imageUrl}
                                   alt="Entry"
-                                  className="w-full h-full rounded-full object-cover border-2 border-[var(--neon-cyan)]"
+                                  width={dotPx}
+                                  height={dotPx}
+                                  className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
                                   style={{
                                     boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
                                   }}

@@ -361,6 +361,7 @@ export function ChatComposer({
                 boxShadow: "0 0 20px rgba(0,245,255,0.2)",
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={imagePreview} 
                 alt="Preview" 
