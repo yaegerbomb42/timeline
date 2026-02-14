@@ -105,9 +105,6 @@ function useDisplayQueue(recentResults: QueueLogItem[]) {
 
 export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProps) {
   const { displayItems, nowMs } = useDisplayQueue(recentResults);
-  const hasActivity = status.pending > 0 || status.processing || displayItems.length > 0;
-  
-  if (!hasActivity) return null;
 
   return (
     <motion.div
@@ -128,7 +125,7 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
             <Brain className="h-4 w-4 text-[var(--neon-purple)]" />
           </motion.div>
           <span className="text-sm font-sans font-semibold text-[var(--text-primary)]">
-            AI Processing Queue
+            Queue Processor
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">
