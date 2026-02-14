@@ -44,6 +44,17 @@ function calculateLabelStride(count: number, slot: number): number {
 // Minimum height for timeline container to ensure adequate space for rollercoaster visualization
 const MIN_TIMELINE_HEIGHT = 340;
 
+// Rollercoaster coordinate system constants
+// Y range within the container: rating 100 (happy) at top, rating 1 (sad) at bottom
+const COASTER_TOP = 50;     // y for rating 100 (top of coaster)
+const COASTER_BOTTOM = 280;  // y for rating 1 (bottom of coaster)
+const COASTER_RANGE = COASTER_BOTTOM - COASTER_TOP;
+
+// Convert a mood rating (1-100) to a y coordinate in the SVG/container
+function ratingToY(rating: number): number {
+  return COASTER_BOTTOM - ((rating - 1) / 99) * COASTER_RANGE;
+}
+
 // Glowing dot with rating inside - Memoized for performance
 const GlowingDot = memo(function GlowingDot({
   chat,
@@ -388,11 +399,12 @@ export function TimelineBar({
         )}
         style={{
           touchAction: 'pan-x pan-y pinch-zoom',
+          minHeight: MIN_TIMELINE_HEIGHT,
         }}
       >
         <div
           ref={scrollContainerRef}
-          className="relative min-h-[340px] h-full overflow-auto"
+          className="relative h-full overflow-auto"
           style={{
             minHeight: MIN_TIMELINE_HEIGHT,
             width: '100%',
@@ -401,17 +413,20 @@ export function TimelineBar({
           }}
         >
           <div
-            className="relative h-full"
+            className="relative"
             style={{
-              width: virtualizer.getTotalSize(),
+              width: Math.max(trackWidth, viewportWidth || 0),
               minWidth: "100%",
+              height: MIN_TIMELINE_HEIGHT,
               transformOrigin: 'top left',
             }}
           >
           {/* Roller coaster path connecting the dots */}
           <svg 
-            className="absolute inset-0 pointer-events-none" 
-            style={{ width: '100%', height: '100%' }}
+            className="absolute top-0 left-0 pointer-events-none" 
+            width={Math.max(trackWidth, viewportWidth || 0)}
+            height={MIN_TIMELINE_HEIGHT}
+            style={{ overflow: 'visible' }}
           >
             <defs>
               {/* Sentiment-based gradient: Red (negative) -> Yellow (neutral) -> Green (positive) */}
@@ -443,7 +458,7 @@ export function TimelineBar({
                   
                   // Avoid division by zero for single day (use 0% for single color fill)
                   const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "0%";
-                  return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="0.8" />;
+                  return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="1" />;
                 })}
               </linearGradient>
             </defs>
@@ -453,63 +468,50 @@ export function TimelineBar({
                   // For rollercoaster path, use one point per day with averaged mood
                   const points = days.map((day, idx) => {
                     const x = idx * slotWidth + slotWidth / 2;
-                    // Calculate average rating for the day
                     const ratings = day.chats
                       .map(c => c.moodAnalysis?.rating ?? 50)
                       .filter(r => r !== null);
                     const avgRating = ratings.length > 0 
                       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
                       : 50;
-                    // Rating 1 (sad) -> y=230 (near bottom), Rating 100 (happy) -> y=30 (near top)
-                    const y = 230 - ((avgRating - 1) / 99) * 200;
+                    const y = ratingToY(avgRating);
                     return { x, y };
                   });
                   
                   if (points.length < 2) return '';
                   
-                  // Create smooth cubic Bézier curve through points for flowing line
+                  // Create smooth cubic Bézier curve through points for flowing rollercoaster
                   let path = `M ${points[0]!.x} ${points[0]!.y}`;
                   
                   for (let i = 1; i < points.length; i++) {
                     const prev = points[i - 1]!;
                     const curr = points[i]!;
-                    
-                    // Calculate control points for smooth curve
                     const dx = curr.x - prev.x;
                     const dy = Math.abs(curr.y - prev.y);
                     
-                    // Enhanced tension for smoother rollercoaster flow
-                    let tension = 0.6;
+                    // Smooth tension for flowing rollercoaster line
+                    const tension = dy > 50 ? 0.5 : 0.6;
                     
-                    // For large vertical changes, use moderate tension for dramatic but smooth swoops
-                    if (dy > 50) {
-                      tension = 0.5;
-                    }
-                    
-                    // Control point 1 (from previous point)
                     const cp1x = prev.x + dx * tension;
                     const cp1y = prev.y;
-                    
-                    // Control point 2 (to current point)
                     const cp2x = curr.x - dx * tension;
                     const cp2y = curr.y;
                     
-                    // Cubic Bézier curve for smooth rollercoaster flow
                     path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
                   }
                   
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth="8"
+                strokeWidth="6"
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: 2, ease: "easeInOut" }}
+                transition={{ duration: Math.min(2, days.length * 0.1), ease: "easeInOut" }}
                 style={{
-                  filter: 'drop-shadow(0 0 16px rgba(255, 200, 100, 0.6)) drop-shadow(0 0 8px rgba(100, 255, 136, 0.6))',
+                  filter: 'drop-shadow(0 0 12px rgba(255, 200, 100, 0.5)) drop-shadow(0 0 6px rgba(100, 255, 136, 0.5))',
                 }}
               />
             )}
@@ -517,8 +519,9 @@ export function TimelineBar({
 
           {/* Animated baseline with gradient */}
           <motion.div
-            className="absolute left-0 right-0 bottom-8 h-[2px]"
+            className="absolute left-0 right-0 h-[2px]"
             style={{
+              top: COASTER_BOTTOM + 20,
               background: "linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-pink), transparent)",
               boxShadow: "0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple)",
             }}
@@ -528,7 +531,7 @@ export function TimelineBar({
             transition={{ duration: 3, repeat: Infinity }}
           />
 
-          <div className="flex h-full items-end absolute left-0 top-0">
+          <div className="absolute left-0 top-0" style={{ width: '100%', height: MIN_TIMELINE_HEIGHT }}>
             {virtualItems.map((virtualItem) => {
               const idx = virtualItem.index;
               const day = days[idx];
@@ -548,14 +551,12 @@ export function TimelineBar({
               const dotPx = Math.max(18, Math.min(26, 22)); // Larger dots for rating visibility
 
               return (
-                <motion.div
+                <div
                   key={day.dayKey}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0, duration: 0.3 }}
-                  className="relative h-full group"
+                  className="relative group"
                   style={{ 
                     width: virtualItem.size, 
+                    height: MIN_TIMELINE_HEIGHT,
                     position: 'absolute',
                     left: virtualItem.start,
                     top: 0,
@@ -563,24 +564,24 @@ export function TimelineBar({
                 >
                   {/* Month label with glow */}
                   {isNewMonth ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="absolute left-1/2 -translate-x-1/2 top-2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md"
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md z-20"
                       style={{
+                        top: 8,
                         textShadow: "0 0 10px var(--glow-cyan)",
                         background: "rgba(0, 245, 255, 0.1)",
                         border: "1px solid rgba(0, 245, 255, 0.3)",
                       }}
                     >
                       {format(day.date, "LLL yyyy")}
-                    </motion.div>
+                    </div>
                   ) : null}
 
                   {/* Animated tick */}
                   <motion.div
-                    className="absolute left-1/2 -translate-x-1/2 bottom-8 h-3 w-[2px]"
+                    className="absolute left-1/2 -translate-x-1/2 h-3 w-[2px]"
                     style={{
+                      top: COASTER_BOTTOM + 14,
                       background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
                       boxShadow: "0 0 5px var(--glow-cyan)",
                     }}
@@ -592,7 +593,7 @@ export function TimelineBar({
 
                   {/* Marks positioned by mood rating for roller coaster effect */}
                   {/* Show ONE aggregated node per day with average mood */}
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full h-full">
+                  <div className="absolute left-1/2 -translate-x-1/2 top-0 w-full" style={{ height: MIN_TIMELINE_HEIGHT }}>
                     <AnimatePresence initial={false}>
                       {(() => {
                         // Calculate average rating for this day
@@ -606,8 +607,8 @@ export function TimelineBar({
                         // Use the first chat for the day as representative (for ID and click handling)
                         const representativeChat = marks[0]!;
                         
-                        // Calculate Y offset based on average mood rating
-                        const yOffset = -30 - ((avgRating - 1) / 99) * 200;
+                        // Calculate Y position matching the SVG rollercoaster path
+                        const yPos = ratingToY(avgRating);
                         
                         // Create a synthetic chat object with averaged mood for display
                         const avgChat = {
@@ -624,25 +625,22 @@ export function TimelineBar({
                         return (
                           <div
                             key={day.dayKey}
-                            className="absolute left-1/2 -translate-x-1/2"
-                            style={{ bottom: '32px' }}
+                            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2"
+                            style={{ top: yPos }}
                           >
                             <GlowingDot
                               chat={avgChat}
                               isNewest={marks.some(c => c.id === newestChatId)}
                               isHighlighted={marks.some(c => c.id === highlightChatId)}
                               onClick={() => {
-                                // When clicked, select the first chat of the day
-                                // (could be enhanced to show all chats for the day)
                                 onSelectChat?.(representativeChat.id);
                               }}
                               onShowRationale={() => {
-                                // Show rationale for the first chat of the day
                                 setSelectedChat(representativeChat);
                                 setShowRationaleModal(true);
                               }}
                               size={dotPx}
-                              yOffset={yOffset}
+                              yOffset={0}
                             />
                           </div>
                         );
@@ -652,16 +650,14 @@ export function TimelineBar({
 
                   {/* Day label with subtle glow */}
                   {showDayLabel ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: idx * 0.05 + 0.2 }}
-                      className="absolute left-1/2 -translate-x-1/2 bottom-1 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
+                      style={{ top: COASTER_BOTTOM + 26 }}
                     >
                       {format(day.date, isNewMonth ? "MMM d" : "d")}
-                    </motion.div>
+                    </div>
                   ) : null}
-                </motion.div>
+                </div>
               );
             })}
           </div>
