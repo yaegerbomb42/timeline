@@ -64,8 +64,8 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   const dayKey = format(now, "yyyy-MM-dd");
   const monthKey = dayKey.slice(0, 7);
   const excerpt = makeExcerpt(text);
-  const mood = analyzeMood(text);
-  const moodAnalysis = analyzeMoodDetailed(text);
+  const mood = text ? analyzeMood(text) : undefined;
+  const moodAnalysis = text ? analyzeMoodDetailed(text) : undefined;
   
   // Upload image to Firebase Storage if provided
   let imageUrl: string | undefined = undefined;

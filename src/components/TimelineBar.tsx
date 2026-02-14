@@ -172,6 +172,123 @@ const GlowingDot = memo(function GlowingDot({
   );
 });
 
+function SwipeableDateInput({ 
+  value, 
+  onChange, 
+  min, 
+  max, 
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  min?: string; 
+  max?: string;
+}) {
+  const parsed = value ? parse(value, "yyyy-MM-dd", new Date()) : null;
+  const month = parsed ? parsed.getMonth() : 0;
+  const day = parsed ? parsed.getDate() : 1;
+  const year = parsed ? parsed.getFullYear() : new Date().getFullYear();
+  
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  
+  function clampDate(y: number, m: number, d: number): string {
+    m = Math.max(0, Math.min(11, m));
+    y = Math.max(2000, Math.min(2099, y));
+    const maxDay = new Date(y, m + 1, 0).getDate();
+    d = Math.max(1, Math.min(maxDay, d));
+    const result = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    if (min && result < min) return min;
+    if (max && result > max) return max;
+    return result;
+  }
+  
+  function handleSegDrag(segment: "month" | "day" | "year", e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault();
+    const touch = 'touches' in e ? e.touches[0] : undefined;
+    const startX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
+    const startVal = segment === "month" ? month : segment === "day" ? day : year;
+    
+    const handleMove = (ev: MouseEvent | TouchEvent) => {
+      let currentX: number;
+      const moveTouch = 'touches' in ev ? (ev as TouchEvent).touches[0] : undefined;
+      if (moveTouch) {
+        currentX = moveTouch.clientX;
+      } else {
+        currentX = (ev as MouseEvent).clientX;
+      }
+      const dx = currentX - startX;
+      const sensitivity = segment === "year" ? 60 : 30;
+      const delta = Math.round(dx / sensitivity);
+      
+      if (delta !== 0) {
+        let newMonth = month, newDay = day, newYear = year;
+        if (segment === "month") newMonth = startVal + delta;
+        else if (segment === "day") newDay = startVal + delta;
+        else newYear = startVal + delta;
+        
+        const newDate = clampDate(newYear, newMonth, newDay);
+        onChange(newDate);
+      }
+    };
+    
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleUp);
+    };
+    
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("touchmove", handleMove);
+    window.addEventListener("touchend", handleUp);
+  }
+  
+  if (!value) {
+    return (
+      <button
+        onClick={() => {
+          const today = format(new Date(), "yyyy-MM-dd");
+          onChange(min && today < min ? min : max && today > max ? max : today);
+        }}
+        className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-muted)] hover:border-[var(--neon-cyan)] transition-colors cursor-pointer"
+      >
+        Pick date
+      </button>
+    );
+  }
+  
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 overflow-hidden select-none">
+      <div
+        onMouseDown={(e) => handleSegDrag("month", e)}
+        onTouchStart={(e) => handleSegDrag("month", e)}
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-cyan)] cursor-ew-resize hover:bg-[var(--neon-cyan)]/10 transition-colors"
+        title="Drag left/right to change month"
+      >
+        {monthNames[month]}
+      </div>
+      <span className="text-[var(--text-muted)] text-[10px]">/</span>
+      <div
+        onMouseDown={(e) => handleSegDrag("day", e)}
+        onTouchStart={(e) => handleSegDrag("day", e)}
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-purple)] cursor-ew-resize hover:bg-[var(--neon-purple)]/10 transition-colors"
+        title="Drag left/right to change day"
+      >
+        {String(day).padStart(2, "0")}
+      </div>
+      <span className="text-[var(--text-muted)] text-[10px]">/</span>
+      <div
+        onMouseDown={(e) => handleSegDrag("year", e)}
+        onTouchStart={(e) => handleSegDrag("year", e)}
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-pink)] cursor-ew-resize hover:bg-[var(--neon-pink)]/10 transition-colors"
+        title="Drag left/right to change year"
+      >
+        {year}
+      </div>
+    </div>
+  );
+}
+
 export function TimelineBar({
   groupedByDay,
   newestChatId,
@@ -335,24 +452,20 @@ export function TimelineBar({
           <div className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 text-[var(--neon-purple)]" />
             <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-sans">From</label>
-            <input
-              type="date"
+            <SwipeableDateInput
               value={startDate}
+              onChange={setStartDate}
               min={minDateStr}
               max={endDate || maxDateStr}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-primary)] focus:border-[var(--neon-cyan)] focus:outline-none focus:ring-1 focus:ring-[var(--neon-cyan)]/30"
             />
           </div>
           <div className="flex items-center gap-1.5">
             <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-sans">To</label>
-            <input
-              type="date"
+            <SwipeableDateInput
               value={endDate}
+              onChange={setEndDate}
               min={startDate || minDateStr}
               max={maxDateStr}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-primary)] focus:border-[var(--neon-cyan)] focus:outline-none focus:ring-1 focus:ring-[var(--neon-cyan)]/30"
             />
           </div>
           {(startDate || endDate) && (
@@ -628,6 +741,16 @@ export function TimelineBar({
                               size={dotPx}
                               yOffset={0}
                             />
+                            {/* Small date under node */}
+                            <div 
+                              className="absolute left-1/2 -translate-x-1/2 text-[8px] font-mono text-[var(--text-secondary)] whitespace-nowrap opacity-70 pointer-events-none"
+                              style={{ 
+                                top: dotPx / 2 + 4,
+                                fontSize: Math.max(6, Math.min(8, dotPx * 0.32)),
+                              }}
+                            >
+                              {format(day.date, "d")}
+                            </div>
                           </div>
                         );
                       })()}
