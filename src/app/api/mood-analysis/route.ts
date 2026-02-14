@@ -85,10 +85,10 @@ Respond with a JSON array of exactly ${body.entries.length} objects, one for eac
 {
   "rating": <integer 1-100, be precise and nuanced>,
   "mood": "<positive|negative|neutral>",
-  "description": "<vivid 3-6 word mood summary capturing the emotional essence>",
+  "description": "<a punchy, complete sentence capturing the emotional essence - NOT just adjectives>",
   "emoji": "<single most appropriate emoji>",
   "rationale": "<3-4 sentence summary: state the dominant emotion, explain key emotional drivers from the text, note any emotional complexity or contradictions, and give your overall impression>",
-  "geminiRationale": "<5-6 sentence deep analysis: analyze the emotional arc of the entry, discuss what the writer may not be saying explicitly, identify patterns of thought or behavior, assess their self-awareness level, note the consciousness type and why, and provide a compassionate psychological perspective>",
+  "geminiRationale": "<5-8 sentence deep analysis (~500 tokens): analyze the emotional arc of the entry, discuss what the writer may not be saying explicitly, identify patterns of thought or behavior, assess their self-awareness level, note the consciousness type and why, and provide a compassionate psychological perspective>",
   "consciousness": "<one of the consciousness indicators above>",
   "score": <number -15 to +15, maps to raw sentiment intensity>
 }
@@ -106,14 +106,19 @@ RATING GUIDELINES (be precise - use the full range with intention):
 - 5-14: Severe distress, crisis, devastating events
 - 1-4: Absolute rock bottom, emergency-level emotional pain
 
+CALIBRATION EXAMPLES:
+- Confused/Ambiguous (~49/100): "User appears confused about where to go next in life, expressing uncertainty about career direction."
+- Deeply Sad (~8/100): "Claims they feel bluer than the sky, expressing profound emotional pain and hopelessness."
+- High Positive (~84/100): "Played with dogs and had a good time fishing with friends at the lake."
+
 CRITICAL RULES:
 - Be PRECISE. A "pretty good day" is 65-72, not 85. "Feeling okay" is 50-55, not 70.
 - Most routine journal entries naturally fall between 40-65.
 - Only give 80+ for genuinely strong positive content with clear emotional evidence.
 - Only give below 25 for genuinely severe negative content.
-- The "description" field should be evocative and specific, not generic. Instead of "feeling good" use "quietly content and grateful" or "buzzing with creative energy".
+- The "description" field should be a COMPLETE SENTENCE, not just adjectives. Example: "Played with dogs and had a good time fishing." NOT "happy and content".
 - The "rationale" should reference SPECIFIC words, phrases, or themes from the entry.
-- The "geminiRationale" should provide genuine psychological insight, not just restate the entry.
+- The "geminiRationale" should provide genuine psychological insight (~500 tokens), not just restate the entry. This is the detailed analysis that shows your expertise.
 
 ENTRIES:
 

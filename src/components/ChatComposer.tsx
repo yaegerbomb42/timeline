@@ -361,6 +361,7 @@ export function ChatComposer({
                 boxShadow: "0 0 20px rgba(0,245,255,0.2)",
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={imagePreview} 
                 alt="Preview" 
@@ -458,7 +459,7 @@ export function ChatComposer({
               }}
             >
               {ripple && <RippleEffect x={ripple.x} y={ripple.y} />}
-              <span>{busy ? "Sending…" : "Send"}</span>
+              <span>{busy ? (imageFile ? "Uploading image…" : "Sending…") : "Send"}</span>
               <motion.div
                 animate={value.trim() && !busy ? { rotate: [0, 15, -15, 0] } : {}}
                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}

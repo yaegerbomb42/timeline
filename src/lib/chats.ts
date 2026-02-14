@@ -35,6 +35,7 @@ export type Chat = {
   moodAnalysis?: MoodAnalysis;
   imageUrl?: string;
   batchId?: string; // For tracking batch imports
+  imageOnly?: boolean; // True if this is a pure image entry with no text
 };
 
 export type BatchImportEntry = {
@@ -64,8 +65,14 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   const dayKey = format(now, "yyyy-MM-dd");
   const monthKey = dayKey.slice(0, 7);
   const excerpt = makeExcerpt(text);
-  const mood = text ? analyzeMood(text) : undefined;
-  const moodAnalysis = text ? analyzeMoodDetailed(text) : undefined;
+  
+  // Determine if this is an image-only entry
+  const isImageOnly = (!text || !text.trim()) && !!imageFile;
+  
+  // For image-only entries, skip mood analysis entirely
+  // For text entries, skip immediate analysis - let the queue handle it
+  const mood = undefined; // Queue will handle mood analysis
+  const moodAnalysis = undefined; // Queue will handle mood analysis
   
   // Upload image to Firebase Storage if provided
   let imageUrl: string | undefined = undefined;
@@ -94,9 +101,14 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
     v: 1,
   };
   
-  // Only add imageUrl if it's defined (Firebase doesn't allow undefined values)
+  // Add imageUrl if defined
   if (imageUrl !== undefined) {
     docData.imageUrl = imageUrl;
+  }
+  
+  // Add imageOnly flag for pure image entries
+  if (isImageOnly) {
+    docData.imageOnly = true;
   }
   
   const docRef = await addDoc(collection(db, "users", uid, "chats"), docData);
