@@ -880,8 +880,6 @@ export function TimelineBar({
                                 <img
                                   src={representativeChat.imageUrl}
                                   alt="Entry"
-                                  width={dotPx}
-                                  height={dotPx}
                                   className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
                                   style={{
                                     width: dotPx,

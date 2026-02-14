@@ -4,14 +4,6 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   // Avoid monorepo root inference when multiple lockfiles exist on a machine.
   outputFileTracingRoot: path.join(__dirname),
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "firebasestorage.googleapis.com",
-      },
-    ],
-  },
   async headers() {
     return [
       {
