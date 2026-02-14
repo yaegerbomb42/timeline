@@ -206,28 +206,30 @@ export function Minimap({
       >
         {/* Density visualization */}
         <div className="absolute inset-0 flex items-end">
-          {totalDays > 0 && Array.from({ length: Math.min(totalDays, 300) }).map((_, idx) => {
-            // Avoid division by zero
-            const divisor = Math.max(1, Math.min(totalDays, 300));
-            const dayIdx = Math.floor((idx / divisor) * totalDays);
-            const density = densityMap.get(dayIdx) || 0;
-            const height = Math.max(4, (density / maxDensity) * 100);
-            
-            return (
-              <div
-                key={idx}
-                className="flex-1 transition-all"
-                style={{
-                  height: `${height}%`,
-                  background: density > 0 
-                    ? `linear-gradient(to top, rgba(0, 245, 255, 0.7), rgba(168, 85, 247, 0.7))`
-                    : 'transparent',
-                  opacity: 0.8,
-                  minWidth: '1px',
-                }}
-              />
-            );
-          })}
+          {totalDays > 0 && (() => {
+            const barCount = Math.min(totalDays, 300);
+            return Array.from({ length: barCount }).map((_, idx) => {
+              // Avoid division by zero
+              const dayIdx = Math.floor((idx / barCount) * totalDays);
+              const density = densityMap.get(dayIdx) || 0;
+              const height = Math.max(4, (density / maxDensity) * 100);
+              
+              return (
+                <div
+                  key={idx}
+                  className="flex-1 transition-all"
+                  style={{
+                    height: `${height}%`,
+                    background: density > 0 
+                      ? `linear-gradient(to top, rgba(0, 245, 255, 0.7), rgba(168, 85, 247, 0.7))`
+                      : 'transparent',
+                    opacity: 0.8,
+                    minWidth: '1px',
+                  }}
+                />
+              );
+            });
+          })()}
         </div>
 
         {/* View window rectangle */}

@@ -646,7 +646,9 @@ export async function recalculateMoodRatingsWithGemini(uid: string, onProgress?:
   const total = snapshot.docs.length;
   
   for (let i = 0; i < snapshot.docs.length; i++) {
-    const docSnap = snapshot.docs[i]!;
+    const docSnap = snapshot.docs[i];
+    if (!docSnap) continue;
+    
     const data = docSnap.data();
     
     // Count entries that need Gemini analysis (missing geminiRationale or consciousness)
@@ -675,7 +677,9 @@ export async function recalculateMoodRatings(uid: string, onProgress?: (current:
   const total = snapshot.docs.length;
   
   for (let i = 0; i < snapshot.docs.length; i++) {
-    const docSnap = snapshot.docs[i]!;
+    const docSnap = snapshot.docs[i];
+    if (!docSnap) continue;
+    
     const data = docSnap.data();
     
     // Update if mood analysis is missing OR if rationale field is missing
