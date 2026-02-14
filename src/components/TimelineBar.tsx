@@ -50,6 +50,7 @@ function getDynamicNodeSize(visibleCount: number): number {
 
 // Scaling constants for dynamic font/stroke sizing
 const NODE_FONT_SIZE_RATIO = 0.38;   // Font size as proportion of node diameter
+const DATE_LABEL_FONT_SIZE_RATIO = 0.4;  // Date label font size as proportion of node diameter
 const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
@@ -835,6 +836,9 @@ export function TimelineBar({
                         };
                         
                         // Render image-only entries differently
+                        // Note: We check for imageUrl to ensure we have an image to display.
+                        // If an image-only entry somehow has no imageUrl (edge case: upload failed),
+                        // it will fall through to regular node rendering with interpolated position.
                         if (allImageOnly && representativeChat.imageUrl) {
                           return (
                             <div
@@ -871,7 +875,7 @@ export function TimelineBar({
                                 className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
                                 style={{ 
                                   top: dotPx / 2 + 4,
-                                  fontSize: Math.max(10, Math.min(12, dotPx * 0.4)),
+                                  fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
                                   textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
                                 }}
                               >
@@ -906,7 +910,7 @@ export function TimelineBar({
                               className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
                               style={{ 
                                 top: dotPx / 2 + 4,
-                                fontSize: Math.max(10, Math.min(12, dotPx * 0.4)),
+                                fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
                                 textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
                               }}
                             >

@@ -67,7 +67,7 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   const excerpt = makeExcerpt(text);
   
   // Determine if this is an image-only entry
-  const isImageOnly = !text.trim() && !!imageFile;
+  const isImageOnly = (!text || !text.trim()) && !!imageFile;
   
   // For image-only entries, skip mood analysis entirely
   // For text entries, skip immediate analysis - let the queue handle it
