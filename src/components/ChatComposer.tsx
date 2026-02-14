@@ -458,7 +458,7 @@ export function ChatComposer({
               }}
             >
               {ripple && <RippleEffect x={ripple.x} y={ripple.y} />}
-              <span>{busy ? "Sending…" : "Send"}</span>
+              <span>{busy ? (imageFile ? "Uploading image…" : "Sending…") : "Send"}</span>
               <motion.div
                 animate={value.trim() && !busy ? { rotate: [0, 15, -15, 0] } : {}}
                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}

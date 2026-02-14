@@ -59,6 +59,78 @@ function ratingToY(rating: number): number {
   return COASTER_BOTTOM - ((rating - 1) / 99) * COASTER_RANGE;
 }
 
+// Geometric interpolation for image-only entries
+// Finds the nearest rated entries before and after, and interpolates based on timestamp
+function interpolateYPosition(
+  targetDate: Date,
+  allDays: DayBucket[]
+): number {
+  // Find nearest rated day before
+  let beforeDay: DayBucket | null = null;
+  let beforeRating: number | null = null;
+  
+  for (let i = allDays.length - 1; i >= 0; i--) {
+    const day = allDays[i]!;
+    if (day.date < targetDate) {
+      // Check if this day has any rated entries (non-image-only)
+      const ratings = day.chats
+        .filter(c => !c.imageOnly)
+        .map(c => c.moodAnalysis?.rating)
+        .filter((r): r is number => r !== undefined && r !== null);
+      
+      if (ratings.length > 0) {
+        beforeDay = day;
+        beforeRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+        break;
+      }
+    }
+  }
+  
+  // Find nearest rated day after
+  let afterDay: DayBucket | null = null;
+  let afterRating: number | null = null;
+  
+  for (let i = 0; i < allDays.length; i++) {
+    const day = allDays[i]!;
+    if (day.date > targetDate) {
+      // Check if this day has any rated entries (non-image-only)
+      const ratings = day.chats
+        .filter(c => !c.imageOnly)
+        .map(c => c.moodAnalysis?.rating)
+        .filter((r): r is number => r !== undefined && r !== null);
+      
+      if (ratings.length > 0) {
+        afterDay = day;
+        afterRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+        break;
+      }
+    }
+  }
+  
+  // If we have both before and after, interpolate
+  if (beforeDay && afterDay && beforeRating !== null && afterRating !== null) {
+    const totalMs = afterDay.date.getTime() - beforeDay.date.getTime();
+    const targetMs = targetDate.getTime() - beforeDay.date.getTime();
+    const ratio = totalMs > 0 ? targetMs / totalMs : 0.5;
+    
+    const interpolatedRating = beforeRating + (afterRating - beforeRating) * ratio;
+    return ratingToY(interpolatedRating);
+  }
+  
+  // If we only have before, use that rating
+  if (beforeRating !== null) {
+    return ratingToY(beforeRating);
+  }
+  
+  // If we only have after, use that rating
+  if (afterRating !== null) {
+    return ratingToY(afterRating);
+  }
+  
+  // Default to neutral if no rated entries exist
+  return ratingToY(50);
+}
+
 // Glowing dot with rating inside - Memoized for performance
 const GlowingDot = memo(function GlowingDot({
   chat,
@@ -542,13 +614,23 @@ export function TimelineBar({
               {/* Sentiment-based gradient: Red (negative) -> Yellow (neutral) -> Green (positive) */}
               <linearGradient id="rollercoaster-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                 {days.map((day, idx) => {
-                  // Calculate average rating for the day
-                  const ratings = day.chats
-                    .map(c => c.moodAnalysis?.rating ?? 50)
-                    .filter(r => r !== null);
-                  const avgRating = ratings.length > 0 
-                    ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
-                    : 50;
+                  // Check if all entries are image-only
+                  const allImageOnly = day.chats.every(c => c.imageOnly);
+                  
+                  let avgRating: number;
+                  if (allImageOnly) {
+                    // For image-only days, use a neutral color (rating 50)
+                    avgRating = 50;
+                  } else {
+                    // Calculate average rating (excluding image-only entries)
+                    const ratings = day.chats
+                      .filter(c => !c.imageOnly)
+                      .map(c => c.moodAnalysis?.rating ?? 50)
+                      .filter(r => r !== null);
+                    avgRating = ratings.length > 0 
+                      ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+                      : 50;
+                  }
                   
                   // Convert rating to color: Red (negative) -> Yellow (neutral) -> Green (positive)
                   let color: string;
@@ -572,15 +654,29 @@ export function TimelineBar({
               <motion.path
                 d={(() => {
                   // For rollercoaster path, use one point per day with averaged mood
+                  // Skip image-only days (they use interpolation instead)
                   const points = days.map((day, idx) => {
                     const x = idx * slotWidth + slotWidth / 2;
-                    const ratings = day.chats
-                      .map(c => c.moodAnalysis?.rating ?? 50)
-                      .filter(r => r !== null);
-                    const avgRating = ratings.length > 0 
-                      ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
-                      : 50;
-                    const y = ratingToY(avgRating);
+                    
+                    // Check if all entries are image-only
+                    const allImageOnly = day.chats.every(c => c.imageOnly);
+                    
+                    let y: number;
+                    if (allImageOnly) {
+                      // Use interpolation for image-only days
+                      y = interpolateYPosition(day.date, allDays);
+                    } else {
+                      // Calculate average rating (excluding image-only entries)
+                      const ratings = day.chats
+                        .filter(c => !c.imageOnly)
+                        .map(c => c.moodAnalysis?.rating ?? 50)
+                        .filter(r => r !== null);
+                      const avgRating = ratings.length > 0 
+                        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+                        : 50;
+                      y = ratingToY(avgRating);
+                    }
+                    
                     return { x, y };
                   });
                   
@@ -699,18 +795,31 @@ export function TimelineBar({
                   <div className="absolute left-1/2 -translate-x-1/2 top-0 w-full" style={{ height: MIN_TIMELINE_HEIGHT }}>
                     <AnimatePresence initial={false}>
                       {(() => {
-                        // Calculate average rating for this day
-                        const ratings = marks
-                          .map(c => c.moodAnalysis?.rating ?? 50)
-                          .filter(r => r !== null);
-                        const avgRating = ratings.length > 0 
-                          ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
-                          : 50;
+                        // Check if ALL entries for this day are image-only
+                        const allImageOnly = marks.every(c => c.imageOnly);
+                        
+                        let yPos: number;
+                        let avgRating: number;
+                        
+                        if (allImageOnly) {
+                          // Use geometric interpolation for image-only days
+                          yPos = interpolateYPosition(day.date, allDays);
+                          avgRating = 50; // Placeholder, not actually used for image-only
+                        } else {
+                          // Calculate average rating for this day (excluding image-only entries)
+                          const ratings = marks
+                            .filter(c => !c.imageOnly)
+                            .map(c => c.moodAnalysis?.rating ?? 50)
+                            .filter(r => r !== null);
+                          avgRating = ratings.length > 0 
+                            ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
+                            : 50;
+                          
+                          // Calculate Y position matching the SVG rollercoaster path
+                          yPos = ratingToY(avgRating);
+                        }
                         
                         const representativeChat = marks[0]!;
-                        
-                        // Calculate Y position matching the SVG rollercoaster path
-                        const yPos = ratingToY(avgRating);
                         
                         // Create a synthetic chat object with averaged mood for display
                         const avgChat = {
@@ -723,6 +832,51 @@ export function TimelineBar({
                               : representativeChat.moodAnalysis.description,
                           } : undefined
                         };
+                        
+                        // Render image-only entries differently
+                        if (allImageOnly && representativeChat.imageUrl) {
+                          return (
+                            <div
+                              key={day.dayKey}
+                              className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2"
+                              style={{ top: yPos }}
+                            >
+                              {/* Image thumbnail node */}
+                              <motion.div
+                                className="relative cursor-pointer"
+                                onClick={() => {
+                                  onSelectChat?.(representativeChat.id);
+                                }}
+                                whileHover={{ scale: 1.2 }}
+                                whileTap={{ scale: 0.9 }}
+                                style={{
+                                  width: dotPx,
+                                  height: dotPx,
+                                }}
+                              >
+                                <img
+                                  src={representativeChat.imageUrl}
+                                  alt="Entry"
+                                  className="w-full h-full rounded-full object-cover border-2 border-[var(--neon-cyan)]"
+                                  style={{
+                                    boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
+                                  }}
+                                />
+                              </motion.div>
+                              {/* Small date under node */}
+                              <div 
+                                className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
+                                style={{ 
+                                  top: dotPx / 2 + 4,
+                                  fontSize: Math.max(10, Math.min(12, dotPx * 0.4)),
+                                  textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
+                                }}
+                              >
+                                {format(day.date, "M/d")}
+                              </div>
+                            </div>
+                          );
+                        }
                         
                         return (
                           <div
