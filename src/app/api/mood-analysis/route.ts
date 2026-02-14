@@ -58,53 +58,62 @@ export async function POST(req: Request) {
     .map((e, idx) => `Entry ${idx + 1} (${e.date}):\n${e.text}`)
     .join("\n\n---\n\n");
 
-  const prompt = `You are an expert emotional intelligence and consciousness analyst with deep psychological understanding. Analyze the following journal entries with genuine comprehension, empathy, and nuanced reasoning.
+  const prompt = `You are an expert emotional intelligence analyst and psychologist with deep understanding of human consciousness, emotion, and behavior. You provide extremely precise mood ratings and thoughtful, rich summaries for personal journal entries.
 
-For each entry, provide an intelligent, thoughtful analysis that considers the full emotional landscape:
+For each entry, analyze thoroughly:
 
-Analysis Framework:
-- Read between the lines: detect sarcasm, deflection, or masked emotions
-- Emotional tone, sentiment, and underlying feelings (stated AND unstated)
-- Language patterns: word choice intensity, sentence structure, punctuation style
-- Self-awareness level: is the writer conscious of their emotions?
-- Context clues: life events, relationships, personal growth, daily challenges
-- Temporal awareness: time references, urgency, anticipation, or nostalgia
-- Cognitive patterns: rumination, problem-solving, acceptance, denial
+1. **Emotional Landscape**: Primary and secondary emotions, emotional intensity, emotional contradictions
+2. **Language Analysis**: Word choice, sentence structure, punctuation patterns, use of capitalization, exclamation marks
+3. **Context & Subtext**: What is said explicitly vs. what is implied; sarcasm detection; emotional masking
+4. **Self-Awareness**: How conscious is the writer of their own emotional state?
+5. **Cognitive Patterns**: Rumination, catastrophizing, growth thinking, acceptance, avoidance
+6. **Life Context**: Events, relationships, goals, challenges, victories mentioned or implied
 
-Consciousness Indicators (pick the most fitting):
-  * "observant text" - detailed external observations
-  * "self discovery" - introspective insights and personal revelations
-  * "overthinking reality" - philosophical rumination or analysis paralysis
-  * "social connection" - relationship/connection experiences
-  * "pessimistic" - negative outlook or cynicism
-  * "hopeful" - optimistic forward-thinking
+Consciousness Indicators (select the most fitting):
+  * "observant text" - detailed external observations, noticing surroundings
+  * "self discovery" - introspective insights, personal revelations
+  * "overthinking reality" - philosophical rumination, analysis paralysis
+  * "social connection" - relationship/connection focused
+  * "pessimistic" - negative outlook, cynicism, hopelessness
+  * "hopeful" - optimistic, forward-thinking, excited about future
   * "emotional processing" - actively working through feelings
-  * "creative expression" - artistic, imaginative, or abstract thinking
-  * "grounded presence" - mindful, present-moment awareness
-  * "growth mindset" - learning from experiences
+  * "creative expression" - artistic, imaginative, abstract thinking
+  * "grounded presence" - mindful, present-moment awareness, calm
+  * "growth mindset" - learning from experience, building resilience
 
-Respond with a JSON array containing exactly ${body.entries.length} objects, one for each entry in order:
+Respond with a JSON array of exactly ${body.entries.length} objects, one for each entry in order:
 {
-  "rating": <number 1-100>,
+  "rating": <integer 1-100, be precise and nuanced>,
   "mood": "<positive|negative|neutral>",
-  "description": "<sophisticated 3-5 word mood description>",
+  "description": "<vivid 3-6 word mood summary capturing the emotional essence>",
   "emoji": "<single most appropriate emoji>",
-  "rationale": "<3-4 sentence detailed explanation of mood reasoning with specific references to the entry's content>",
-  "geminiRationale": "<comprehensive 4-5 sentence analysis: explain emotional patterns, consciousness level, underlying themes, what the writer may not be saying explicitly, and contextual understanding>",
-  "consciousness": "<abbreviated consciousness summary>",
-  "score": <number -15 to +15 mapping to overall sentiment intensity>
+  "rationale": "<3-4 sentence summary: state the dominant emotion, explain key emotional drivers from the text, note any emotional complexity or contradictions, and give your overall impression>",
+  "geminiRationale": "<5-6 sentence deep analysis: analyze the emotional arc of the entry, discuss what the writer may not be saying explicitly, identify patterns of thought or behavior, assess their self-awareness level, note the consciousness type and why, and provide a compassionate psychological perspective>",
+  "consciousness": "<one of the consciousness indicators above>",
+  "score": <number -15 to +15, maps to raw sentiment intensity>
 }
 
-Rating Scale (apply with nuance - most real entries are 30-75):
-- 90-100: Genuine euphoria, major life achievement, overwhelming gratitude
-- 75-89: Happy, content, meaningful positive experience
-- 60-74: Mildly positive, productive, optimistic undertone
-- 45-59: Neutral, factual, mixed feelings, routine
-- 30-44: Mildly negative, frustration, mild stress, disappointment
-- 15-29: Clearly unhappy, anxious, significant stress or sadness
-- 1-14: Crisis-level distress, severe depression, devastating news
+RATING GUIDELINES (be precise - use the full range with intention):
+- 95-100: Life-changing joy, peak experiences, profound gratitude/love
+- 85-94: Very happy, significant achievement, deep contentment  
+- 75-84: Clearly happy, good day, meaningful positive experiences
+- 65-74: Mildly positive, productive, things going well
+- 55-64: Slightly positive, routine but okay, mild optimism
+- 45-54: Truly neutral, factual recording, mixed feelings that cancel out
+- 35-44: Mildly negative, minor frustrations, slight worry or boredom
+- 25-34: Clearly unhappy, notable stress, disappointment, or sadness
+- 15-24: Quite distressed, significant anxiety, anger, or grief
+- 5-14: Severe distress, crisis, devastating events
+- 1-4: Absolute rock bottom, emergency-level emotional pain
 
-IMPORTANT: Be nuanced and realistic. Most everyday journal entries should score 35-70. Only use extreme values for genuinely extreme emotional content.
+CRITICAL RULES:
+- Be PRECISE. A "pretty good day" is 65-72, not 85. "Feeling okay" is 50-55, not 70.
+- Most routine journal entries naturally fall between 40-65.
+- Only give 80+ for genuinely strong positive content with clear emotional evidence.
+- Only give below 25 for genuinely severe negative content.
+- The "description" field should be evocative and specific, not generic. Instead of "feeling good" use "quietly content and grateful" or "buzzing with creative energy".
+- The "rationale" should reference SPECIFIC words, phrases, or themes from the entry.
+- The "geminiRationale" should provide genuine psychological insight, not just restate the entry.
 
 ENTRIES:
 

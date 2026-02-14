@@ -3,12 +3,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { doc, collection, query, getDocs, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { MoodAnalysis } from "@/lib/sentiment";
 
 type PendingEntry = {
   id: string;
   text: string;
   date: string;
+};
+
+export type QueueLogItem = {
+  id: string;
+  entryId: string;
+  date: string;
+  rating: number;
+  mood: string;
+  description: string;
+  emoji: string;
+  consciousness: string;
+  geminiRationale: string;
+  timestamp: number;
 };
 
 type QueueStatus = {
@@ -21,7 +33,6 @@ type QueueStatus = {
 
 const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
-const MAX_BATCH_SIZE_API = 25; // API can handle up to 25, but we use 15 for optimal balance
 
 /**
  * Hook to manage background mood analysis queue
@@ -35,6 +46,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     total: 0,
     errors: 0,
   });
+  const [recentResults, setRecentResults] = useState<QueueLogItem[]>([]);
   
   const processingRef = useRef(false);
   const abortRef = useRef(false);
@@ -127,6 +139,24 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
             },
           });
           updated++;
+          
+          // Add to recent results log
+          const matchingEntry = entries.find(e => e.id === result.id);
+          setRecentResults((prev) => {
+            const newItem: QueueLogItem = {
+              id: `${result.id}-${Date.now()}`,
+              entryId: result.id,
+              date: matchingEntry?.date || "",
+              rating: result.rating,
+              mood: result.mood,
+              description: result.description,
+              emoji: result.emoji,
+              consciousness: result.consciousness || "neutral observation",
+              geminiRationale: result.geminiRationale || result.rationale || "",
+              timestamp: Date.now(),
+            };
+            return [newItem, ...prev].slice(0, 10); // Keep most recent 10
+          });
         } catch (updateError) {
           console.error(`Failed to update entry ${result.id}:`, updateError);
         }
@@ -247,6 +277,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
 
   return {
     status,
+    recentResults,
     startQueue,
     stopQueue,
     isProcessing: status.processing,

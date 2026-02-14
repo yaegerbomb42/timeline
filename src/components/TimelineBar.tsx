@@ -1,18 +1,15 @@
 "use client";
 
-import { format, parse } from "date-fns";
+import { format, parse, isAfter, isBefore, startOfDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Sparkles } from "lucide-react";
+import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
 import { getMoodColor } from "@/lib/sentiment";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
-import { ZoomSlider } from "@/components/ZoomSlider";
-import { Minimap } from "@/components/Minimap";
 
 type DayBucket = {
   dayKey: string; // yyyy-MM-dd
@@ -22,23 +19,6 @@ type DayBucket = {
 
 function isValidDayKey(dayKey: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
-}
-
-// Helper function to determine minimum slot width based on entry count
-function getMinSlotWidth(count: number): number {
-  if (count > 2000) return 8;
-  if (count > 1000) return 12;
-  if (count > 500) return 16;
-  return 20;
-}
-
-// Helper function to calculate label stride based on count and slot width
-function calculateLabelStride(count: number, slot: number): number {
-  if (count > 2000) return Math.max(100, Math.ceil(800 / slot));
-  if (count > 1000) return Math.max(60, Math.ceil(480 / slot));
-  if (count > 500) return Math.max(30, Math.ceil(240 / slot));
-  if (count > 200) return Math.max(15, Math.ceil(120 / slot));
-  return Math.max(5, Math.ceil(60 / slot));
 }
 
 // Minimum height for timeline container to ensure adequate space for rollercoaster visualization
@@ -54,6 +34,25 @@ const COASTER_RANGE = COASTER_BOTTOM - COASTER_TOP;
 const CURVE_TENSION_DEFAULT = 0.6;  // Standard horizontal control point ratio
 const CURVE_TENSION_STEEP = 0.5;    // For large vertical mood changes (>50px)
 const STEEP_THRESHOLD = 50;          // Y-distance threshold for reduced tension
+
+// Calculate dynamic node size based on visible event count
+function getDynamicNodeSize(visibleCount: number): number {
+  if (visibleCount > 3000) return 10;
+  if (visibleCount > 1500) return 12;
+  if (visibleCount > 800) return 14;
+  if (visibleCount > 400) return 16;
+  if (visibleCount > 200) return 18;
+  if (visibleCount > 100) return 20;
+  if (visibleCount > 50) return 22;
+  return 26;
+}
+
+// Scaling constants for dynamic font/stroke sizing
+const NODE_FONT_SIZE_RATIO = 0.38;   // Font size as proportion of node diameter
+const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
+const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
+const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
+const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
 
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
@@ -146,8 +145,9 @@ const GlowingDot = memo(function GlowingDot({
       >
         {/* Rating number inside circle */}
         <span 
-          className="text-[9px] font-bold font-mono pointer-events-none"
+          className="font-bold font-mono pointer-events-none"
           style={{
+            fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
             color: 'rgba(255, 255, 255, 0.95)',
             textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
           }}
@@ -188,12 +188,16 @@ export function TimelineBar({
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [showRationaleModal, setShowRationaleModal] = useState(false);
   
-  // Zoom state management
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const MIN_ZOOM = 1;
-  const MAX_ZOOM = 10;
+  // Date range state
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  
+  // Drag-to-scroll state
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const scrollStartRef = useRef(0);
 
-  const days = useMemo<DayBucket[]>(() => {
+  const allDays = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
       .filter(([dayKey]) => isValidDayKey(dayKey))
       .map(([dayKey, chats]) => ({
@@ -205,111 +209,48 @@ export function TimelineBar({
     return entries;
   }, [groupedByDay]);
 
-  // Calculate slot width based on zoom level
+  // Filter days by selected date range
+  const days = useMemo<DayBucket[]>(() => {
+    if (!startDate && !endDate) return allDays;
+    
+    return allDays.filter((day) => {
+      if (startDate) {
+        const start = startOfDay(parse(startDate, "yyyy-MM-dd", new Date()));
+        if (isBefore(day.date, start)) return false;
+      }
+      if (endDate) {
+        const end = startOfDay(parse(endDate, "yyyy-MM-dd", new Date()));
+        if (isAfter(day.date, end)) return false;
+      }
+      return true;
+    });
+  }, [allDays, startDate, endDate]);
+
+  // Calculate layout: slot width fills the viewport for selected range
   const { slotWidth, trackWidth, labelStride } = useMemo(() => {
     const count = days.length || 1;
+    const available = viewportWidth || 600;
     
-    // Base slot width calculation
-    const minSlot = getMinSlotWidth(count);
-    const maxSlot = 200; // Increased for higher zoom
-    
-    // Apply zoom multiplier
-    const baseSlot = Math.max(minSlot, 20);
-    const slot = Math.min(maxSlot, baseSlot * zoomLevel);
+    // Distribute width evenly across all visible days to fill viewport
+    const slot = Math.max(MIN_SLOT_WIDTH_PX, available / count);
     const track = slot * count;
     
-    // Adjust label stride based on zoom
-    const stride = calculateLabelStride(count, slot);
+    // Label stride adapts to available space per slot
+    let stride: number;
+    if (slot < 15) stride = Math.max(50, Math.ceil(400 / slot));
+    else if (slot < 30) stride = Math.max(20, Math.ceil(200 / slot));
+    else if (slot < 60) stride = Math.max(7, Math.ceil(80 / slot));
+    else stride = Math.max(1, Math.ceil(40 / slot));
     
-    return { slotWidth: slot, trackWidth: track, labelStride: stride };
-  }, [viewportWidth, days.length, zoomLevel]);
+    return { slotWidth: slot, trackWidth: Math.max(track, available), labelStride: stride };
+  }, [viewportWidth, days.length]);
 
-  // Setup virtualizer for horizontal scrolling
-  const virtualizer = useVirtualizer({
-    count: days.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => slotWidth,
-    horizontal: true,
-    overscan: 50, // Render 50 items before/after visible range
-  });
+  // Dynamic node size based on visible count
+  const dotPx = useMemo(() => getDynamicNodeSize(days.length), [days.length]);
 
-  const virtualItems = virtualizer.getVirtualItems();
-  
-  // Calculate visible range for minimap
-  const visibleStartIdx = virtualItems[0]?.index || 0;
-  const visibleEndIdx = virtualItems[virtualItems.length - 1]?.index || days.length - 1;
-  
-  // Calculate visible days count for zoom slider
-  const visibleDaysCount = visibleEndIdx - visibleStartIdx + 1;
-
-  // Density map for minimap
-  const densityMap = useMemo(() => {
-    const map = new Map<number, number>();
-    days.forEach((day, idx) => {
-      map.set(idx, day.chats.length);
-    });
-    return map;
-  }, [days]);
-
-  // Handle zoom change
-  const handleZoomChange = useCallback((newZoom: number) => {
-    const scrollElement = scrollContainerRef.current;
-    if (!scrollElement) {
-      setZoomLevel(newZoom);
-      return;
-    }
-    
-    // Calculate center point before zoom
-    const scrollLeft = scrollElement.scrollLeft;
-    const viewportCenter = scrollLeft + (viewportWidth / 2);
-    const centerRatio = viewportCenter / (trackWidth || 1);
-    
-    // Update zoom
-    setZoomLevel(newZoom);
-    
-    // After zoom, restore center point (done in useEffect)
-    requestAnimationFrame(() => {
-      const newTrackWidth = slotWidth * days.length;
-      const newCenter = centerRatio * newTrackWidth;
-      const newScrollLeft = newCenter - (viewportWidth / 2);
-      scrollElement.scrollLeft = Math.max(0, newScrollLeft);
-    });
-  }, [viewportWidth, trackWidth, slotWidth, days.length]);
-
-  // Handle minimap view window change
-  const handleMinimapChange = useCallback((startIdx: number, endIdx: number) => {
-    const scrollElement = scrollContainerRef.current;
-    if (!scrollElement) return;
-    
-    // Calculate scroll position to show the selected range
-    const scrollLeft = startIdx * slotWidth;
-    scrollElement.scrollLeft = scrollLeft;
-    
-    // Optionally adjust zoom to fit the range
-    const requestedDays = endIdx - startIdx;
-    const currentVisibleDays = viewportWidth / slotWidth;
-    if (requestedDays > 0 && currentVisibleDays > 0) {
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (currentVisibleDays / requestedDays)));
-      setZoomLevel(newZoom);
-    }
-  }, [slotWidth, viewportWidth, zoomLevel, MIN_ZOOM, MAX_ZOOM]);
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts: arrow keys to scroll
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          handleZoomChange(Math.min(MAX_ZOOM, zoomLevel + 0.5));
-        } else if (e.key === '-') {
-          e.preventDefault();
-          handleZoomChange(Math.max(MIN_ZOOM, zoomLevel - 0.5));
-        } else if (e.key === '0') {
-          e.preventDefault();
-          setZoomLevel(1);
-        }
-      }
-      
       const scrollElement = scrollContainerRef.current;
       if (!scrollElement) return;
       
@@ -328,31 +269,36 @@ export function TimelineBar({
       }
     };
 
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.2 : 0.2;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + delta));
-        handleZoomChange(newZoom);
-      }
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    const scrollElement = scrollContainerRef.current;
-    if (scrollElement) {
-      scrollElement.addEventListener('wheel', handleWheel, { passive: false });
-    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [slotWidth]);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (scrollElement) {
-        scrollElement.removeEventListener('wheel', handleWheel);
-      }
+  // Mouse drag-to-scroll
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start drag on interactive elements
+    if ((e.target as HTMLElement).closest('button, input, select, a')) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = e.clientX;
+    scrollStartRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !scrollContainerRef.current) return;
+      const dx = e.clientX - dragStartXRef.current;
+      scrollContainerRef.current.scrollLeft = scrollStartRef.current - dx;
     };
-  }, [zoomLevel, slotWidth, handleZoomChange, MIN_ZOOM, MAX_ZOOM]);
-
-  // No auto-scroll - users can zoom/pan to navigate
-  // Removed auto-scroll to newest side to allow users to see full timeline
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const rangeLabel = useMemo(() => {
     if (days.length === 0) return "No entries yet";
@@ -362,9 +308,14 @@ export function TimelineBar({
     return `${format(a, "LLL yyyy")} → ${format(b, "LLL yyyy")}`;
   }, [days]);
 
+  // Date bounds for the date inputs
+  const minDateStr = allDays.length > 0 ? allDays[0]!.dayKey : "";
+  const maxDateStr = allDays.length > 0 ? allDays[allDays.length - 1]!.dayKey : "";
+
   return (
     <div className="flex h-full flex-col px-6 py-6">
-      <div className="flex items-center justify-between gap-4 mb-6">
+      {/* Header with date range controls */}
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -378,6 +329,44 @@ export function TimelineBar({
           </motion.div>
           <span className="font-semibold">{rangeLabel}</span>
         </motion.div>
+        
+        {/* Date range picker */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-[var(--neon-purple)]" />
+            <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-sans">From</label>
+            <input
+              type="date"
+              value={startDate}
+              min={minDateStr}
+              max={endDate || maxDateStr}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-primary)] focus:border-[var(--neon-cyan)] focus:outline-none focus:ring-1 focus:ring-[var(--neon-cyan)]/30"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-sans">To</label>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || minDateStr}
+              max={maxDateStr}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-primary)] focus:border-[var(--neon-cyan)] focus:outline-none focus:ring-1 focus:ring-[var(--neon-cyan)]/30"
+            />
+          </div>
+          {(startDate || endDate) && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => { setStartDate(""); setEndDate(""); }}
+              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/60 px-2 py-1 text-[10px] font-sans text-[var(--neon-cyan)] hover:border-[var(--neon-cyan)] transition-all"
+            >
+              Reset
+            </motion.button>
+          )}
+        </div>
+
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -387,7 +376,7 @@ export function TimelineBar({
             <>
               <Sparkles className="h-3 w-3 text-[var(--neon-purple)]" />
               {days.length} day{days.length === 1 ? "" : "s"}
-              <span className="text-[10px] opacity-90 ml-2 font-semibold">(pinch to zoom)</span>
+              <span className="text-[10px] opacity-90 ml-2 font-semibold">(drag or arrow keys to scroll)</span>
             </>
           )}
         </motion.div>
@@ -396,13 +385,12 @@ export function TimelineBar({
       <div
         ref={viewportRef}
         className={cn(
-          "mt-4 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
+          "mt-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/40 backdrop-blur-xl",
           "flex-1",
           "overflow-hidden",
           "shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
         )}
         style={{
-          touchAction: 'pan-x pan-y pinch-zoom',
           minHeight: MIN_TIMELINE_HEIGHT,
         }}
       >
@@ -414,12 +402,14 @@ export function TimelineBar({
             width: '100%',
             scrollbarWidth: "thin",
             scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
+            cursor: 'grab',
           }}
+          onMouseDown={handleMouseDown}
         >
           <div
             className="relative"
             style={{
-              width: Math.max(trackWidth, viewportWidth || 0),
+              width: trackWidth,
               minWidth: "100%",
               height: MIN_TIMELINE_HEIGHT,
               transformOrigin: 'top left',
@@ -428,7 +418,7 @@ export function TimelineBar({
           {/* Roller coaster path connecting the dots */}
           <svg 
             className="absolute top-0 left-0 pointer-events-none" 
-            width={Math.max(trackWidth, viewportWidth || 0)}
+            width={trackWidth}
             height={MIN_TIMELINE_HEIGHT}
             style={{ overflow: 'visible' }}
           >
@@ -447,20 +437,16 @@ export function TimelineBar({
                   // Convert rating to color: Red (negative) -> Yellow (neutral) -> Green (positive)
                   let color: string;
                   if (avgRating < 40) {
-                    // Negative: Red with intensity based on how low the rating is
                     const intensity = (40 - avgRating) / 40;
                     color = `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
                   } else if (avgRating > 60) {
-                    // Positive: Green with intensity based on how high the rating is
                     const intensity = (avgRating - 60) / 40;
                     color = `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
                   } else {
-                    // Neutral: Yellow/Orange gradient
                     const neutralPos = (avgRating - 40) / 20;
                     color = `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
                   }
                   
-                  // Avoid division by zero for single day (use 0% for single color fill)
                   const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "0%";
                   return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="1" />;
                 })}
@@ -484,7 +470,7 @@ export function TimelineBar({
                   
                   if (points.length < 2) return '';
                   
-                  // Create smooth cubic Bézier curve through points for flowing rollercoaster
+                  // Create smooth cubic Bézier curve through points
                   let path = `M ${points[0]!.x} ${points[0]!.y}`;
                   
                   for (let i = 1; i < points.length; i++) {
@@ -493,7 +479,6 @@ export function TimelineBar({
                     const dx = curr.x - prev.x;
                     const dy = Math.abs(curr.y - prev.y);
                     
-                    // Smooth tension for flowing rollercoaster line
                     const tension = dy > STEEP_THRESHOLD ? CURVE_TENSION_STEEP : CURVE_TENSION_DEFAULT;
                     
                     const cp1x = prev.x + dx * tension;
@@ -507,7 +492,7 @@ export function TimelineBar({
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth="6"
+                strokeWidth={Math.max(MIN_STROKE_WIDTH, Math.min(MAX_STROKE_WIDTH, slotWidth / STROKE_SLOT_RATIO))}
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -536,11 +521,7 @@ export function TimelineBar({
           />
 
           <div className="absolute left-0 top-0" style={{ width: '100%', height: MIN_TIMELINE_HEIGHT }}>
-            {virtualItems.map((virtualItem) => {
-              const idx = virtualItem.index;
-              const day = days[idx];
-              if (!day) return null;
-
+            {days.map((day, idx) => {
               const prevMonth = idx > 0 ? format(days[idx - 1]!.date, "yyyy-MM") : null;
               const thisMonth = format(day.date, "yyyy-MM");
               const isNewMonth = prevMonth !== thisMonth;
@@ -552,22 +533,21 @@ export function TimelineBar({
                 isNewMonth;
 
               const marks = day.chats;
-              const dotPx = Math.max(18, Math.min(26, 22)); // Larger dots for rating visibility
 
               return (
                 <div
                   key={day.dayKey}
                   className="relative group"
                   style={{ 
-                    width: virtualItem.size, 
+                    width: slotWidth, 
                     height: MIN_TIMELINE_HEIGHT,
                     position: 'absolute',
-                    left: virtualItem.start,
+                    left: idx * slotWidth,
                     top: 0,
                   }}
                 >
                   {/* Month label with glow */}
-                  {isNewMonth ? (
+                  {isNewMonth && slotWidth > 12 ? (
                     <div
                       className="absolute left-1/2 -translate-x-1/2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md z-20"
                       style={{
@@ -575,6 +555,7 @@ export function TimelineBar({
                         textShadow: "0 0 10px var(--glow-cyan)",
                         background: "rgba(0, 245, 255, 0.1)",
                         border: "1px solid rgba(0, 245, 255, 0.3)",
+                        fontSize: Math.max(8, Math.min(12, slotWidth / 5)),
                       }}
                     >
                       {format(day.date, "LLL yyyy")}
@@ -582,18 +563,20 @@ export function TimelineBar({
                   ) : null}
 
                   {/* Animated tick */}
-                  <motion.div
-                    className="absolute left-1/2 -translate-x-1/2 h-3 w-[2px]"
-                    style={{
-                      top: COASTER_BOTTOM + 14,
-                      background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
-                      boxShadow: "0 0 5px var(--glow-cyan)",
-                    }}
-                    animate={{
-                      opacity: [0.5, 1, 0.5],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
+                  {slotWidth > 4 && (
+                    <motion.div
+                      className="absolute left-1/2 -translate-x-1/2 h-3 w-[2px]"
+                      style={{
+                        top: COASTER_BOTTOM + 14,
+                        background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
+                        boxShadow: "0 0 5px var(--glow-cyan)",
+                      }}
+                      animate={{
+                        opacity: [0.5, 1, 0.5],
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                  )}
 
                   {/* Marks positioned by mood rating for roller coaster effect */}
                   {/* Show ONE aggregated node per day with average mood */}
@@ -608,7 +591,6 @@ export function TimelineBar({
                           ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
                           : 50;
                         
-                        // Use the first chat for the day as representative (for ID and click handling)
                         const representativeChat = marks[0]!;
                         
                         // Calculate Y position matching the SVG rollercoaster path
@@ -653,10 +635,13 @@ export function TimelineBar({
                   </div>
 
                   {/* Day label with subtle glow */}
-                  {showDayLabel ? (
+                  {showDayLabel && slotWidth > 10 ? (
                     <div
                       className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
-                      style={{ top: COASTER_BOTTOM + 26 }}
+                      style={{ 
+                        top: COASTER_BOTTOM + 26,
+                        fontSize: Math.max(7, Math.min(10, slotWidth / 4)),
+                      }}
                     >
                       {format(day.date, isNewMonth ? "MMM d" : "d")}
                     </div>
@@ -669,26 +654,10 @@ export function TimelineBar({
         </div>
       </div>
 
-      {/* Zoom Slider */}
-      <ZoomSlider
-        zoomLevel={zoomLevel}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        onZoomChange={handleZoomChange}
-        visibleDaysCount={visibleDaysCount}
-        totalDays={days.length}
-      />
-
-      {/* Minimap */}
-      <Minimap
-        totalDays={days.length}
-        densityMap={densityMap}
-        visibleStartIdx={visibleStartIdx}
-        visibleEndIdx={visibleEndIdx}
-        onViewWindowChange={handleMinimapChange}
-        startDate={days[0]?.date}
-        endDate={days[days.length - 1]?.date}
-      />
+      {/* Navigation hint */}
+      <div className="mt-2 text-[10px] text-[var(--text-muted)] font-sans text-center">
+        Arrow keys to scroll • Drag to pan • Pick dates above to filter range
+      </div>
 
       {/* Mood Rationale Modal */}
       <MoodRationaleModal
