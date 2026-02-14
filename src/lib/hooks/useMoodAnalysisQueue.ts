@@ -241,6 +241,10 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     } finally {
       processingRef.current = false;
       setStatus((prev) => ({ ...prev, processing: false }));
+      
+      // After processing completes, check if new entries arrived during processing.
+      // If so, the onSnapshot listener will update pending count, which will trigger
+      // the auto-start effect to run again after a short delay.
     }
   }, [uid, apiKey, enabled, processBatch]);
 
@@ -252,34 +256,41 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     abortRef.current = true;
   }, []);
 
-  // Auto-start processing when there are pending entries and we have an API key
-  // Uses a ref to track if a start timer is pending, resets after each cycle
-  const autoStartRef = useRef(false);
+  // Auto-start processing when there are pending entries and we have an API key.
+  // Uses a timer ref to debounce rapid re-triggers while still reliably restarting
+  // when new entries arrive or processing completes with remaining entries.
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Clear any pending auto-start timer when deps change
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+
     if (
       enabled &&
       uid &&
       apiKey &&
       status.pending > 0 &&
       !status.processing &&
-      !processingRef.current &&
-      !autoStartRef.current
+      !processingRef.current
     ) {
-      autoStartRef.current = true;
-      // Small delay to avoid rapid re-triggers
-      const timer = setTimeout(() => {
-        autoStartRef.current = false;
-        void processQueue();
+      // Delay before starting to avoid rapid re-triggers after a batch completes
+      autoTimerRef.current = setTimeout(() => {
+        autoTimerRef.current = null;
+        // Re-check all conditions after the delay (state/refs may have changed)
+        if (enabled && uid && apiKey && !processingRef.current) {
+          void processQueue();
+        }
       }, 2000);
-      return () => {
-        clearTimeout(timer);
-        autoStartRef.current = false;
-      };
     }
-    // Reset auto-start flag when processing completes so new entries can trigger it
-    if (!status.processing && !processingRef.current) {
-      autoStartRef.current = false;
-    }
+
+    return () => {
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = null;
+      }
+    };
   }, [enabled, uid, apiKey, status.pending, status.processing, processQueue]);
 
   return {
