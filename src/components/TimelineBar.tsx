@@ -202,7 +202,6 @@ export function TimelineBar({
 
   // Calculate slot width based on zoom level
   const { slotWidth, trackWidth, labelStride } = useMemo(() => {
-    const width = viewportWidth || 0;
     const count = days.length || 1;
     
     // Base slot width calculation

@@ -58,49 +58,53 @@ export async function POST(req: Request) {
     .map((e, idx) => `Entry ${idx + 1} (${e.date}):\n${e.text}`)
     .join("\n\n---\n\n");
 
-  const prompt = `You are an expert emotional intelligence and consciousness analyst. Analyze the following journal entries with deep comprehension-based judging.
+  const prompt = `You are an expert emotional intelligence and consciousness analyst with deep psychological understanding. Analyze the following journal entries with genuine comprehension, empathy, and nuanced reasoning.
 
-For each entry, provide:
-1. A sophisticated mood rating based on understanding context, subtext, and emotional nuance
-2. Detailed rationale explaining your reasoning (3-4 sentences minimum)
-3. A consciousness-level assessment with abbreviated summary
+For each entry, provide an intelligent, thoughtful analysis that considers the full emotional landscape:
 
-Consider:
-- Emotional tone, sentiment, and underlying feelings
-- Language patterns, word choice, and intensity
-- Self-awareness, introspection, and depth of thought
-- Context: life events, relationships, personal growth
-- Consciousness indicators:
+Analysis Framework:
+- Read between the lines: detect sarcasm, deflection, or masked emotions
+- Emotional tone, sentiment, and underlying feelings (stated AND unstated)
+- Language patterns: word choice intensity, sentence structure, punctuation style
+- Self-awareness level: is the writer conscious of their emotions?
+- Context clues: life events, relationships, personal growth, daily challenges
+- Temporal awareness: time references, urgency, anticipation, or nostalgia
+- Cognitive patterns: rumination, problem-solving, acceptance, denial
+
+Consciousness Indicators (pick the most fitting):
   * "observant text" - detailed external observations
-  * "self discovery" - introspective insights
-  * "overthinking reality" - philosophical rumination
+  * "self discovery" - introspective insights and personal revelations
+  * "overthinking reality" - philosophical rumination or analysis paralysis
   * "social connection" - relationship/connection experiences
-  * "pessimistic" - negative outlook
+  * "pessimistic" - negative outlook or cynicism
   * "hopeful" - optimistic forward-thinking
-  * "emotional processing" - working through feelings
-  * "creative expression" - artistic/creative thinking
+  * "emotional processing" - actively working through feelings
+  * "creative expression" - artistic, imaginative, or abstract thinking
+  * "grounded presence" - mindful, present-moment awareness
+  * "growth mindset" - learning from experiences
 
 Respond with a JSON array containing exactly ${body.entries.length} objects, one for each entry in order:
 {
   "rating": <number 1-100>,
   "mood": "<positive|negative|neutral>",
-  "description": "<sophisticated mood description>",
-  "emoji": "<appropriate emoji>",
-  "rationale": "<3-4 sentence detailed explanation of mood reasoning>",
-  "geminiRationale": "<comprehensive analysis: explain emotional patterns, consciousness level, underlying themes, and contextual understanding - 4-5 sentences>",
-  "consciousness": "<abbreviated summary, e.g. 'observant text', 'self discovery', 'overthinking reality again', 'social connection', 'pessimistic', 'hopeful'>",
-  "score": <number -15 to +15>
+  "description": "<sophisticated 3-5 word mood description>",
+  "emoji": "<single most appropriate emoji>",
+  "rationale": "<3-4 sentence detailed explanation of mood reasoning with specific references to the entry's content>",
+  "geminiRationale": "<comprehensive 4-5 sentence analysis: explain emotional patterns, consciousness level, underlying themes, what the writer may not be saying explicitly, and contextual understanding>",
+  "consciousness": "<abbreviated consciousness summary>",
+  "score": <number -15 to +15 mapping to overall sentiment intensity>
 }
 
-Rating scale (based on comprehensive understanding):
-- 90-100: Ecstatic, thrilled, highly optimistic, peak consciousness
-- 75-89: Happy, content, positive, good self-awareness
-- 60-74: Upbeat, hopeful, mildly positive, reflective
-- 50-59: Neutral, balanced, contemplative
-- 40-49: Slightly down, contemplative, introspective
-- 25-39: Stressed, anxious, disappointed, struggling
-- 10-24: Sad, depressed, emotionally burdened
-- 1-9: Devastated, heartbroken, severe distress
+Rating Scale (apply with nuance - most real entries are 30-75):
+- 90-100: Genuine euphoria, major life achievement, overwhelming gratitude
+- 75-89: Happy, content, meaningful positive experience
+- 60-74: Mildly positive, productive, optimistic undertone
+- 45-59: Neutral, factual, mixed feelings, routine
+- 30-44: Mildly negative, frustration, mild stress, disappointment
+- 15-29: Clearly unhappy, anxious, significant stress or sadness
+- 1-14: Crisis-level distress, severe depression, devastating news
+
+IMPORTANT: Be nuanced and realistic. Most everyday journal entries should score 35-70. Only use extreme values for genuinely extreme emotional content.
 
 ENTRIES:
 

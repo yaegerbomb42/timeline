@@ -47,7 +47,6 @@ export function ZoomSlider({
     if (!visibleDaysCount || !totalDays) return "";
     if (visibleDaysCount >= totalDays) return "Entire timeline";
     
-    const percentage = (visibleDaysCount / totalDays) * 100;
     if (visibleDaysCount === 1) return "1 day";
     if (visibleDaysCount < 7) return `${visibleDaysCount} days`;
     if (visibleDaysCount < 30) {
