@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, Zap, Clock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useMemo, useSyncExternalStore, useCallback } from "react";
 import type { QueueLogItem } from "@/lib/hooks/useMoodAnalysisQueue";
 
 interface GeminiQueuePanelProps {
@@ -26,42 +26,76 @@ function getMoodColorForPanel(mood: string): string {
 
 const DISPLAY_DURATION_MS = 10_000;
 
+// External store for tracking seen IDs and display items
+// This avoids calling setState in effects which violates react-hooks/set-state-in-effect
+const queueStore = {
+  seenIds: new Set<string>(),
+  items: [] as (QueueLogItem & { expiresAt: number })[],
+  listeners: new Set<() => void>(),
+  
+  addItems(newResults: QueueLogItem[]) {
+    const now = Date.now();
+    let changed = false;
+    for (const item of newResults) {
+      if (!this.seenIds.has(item.id)) {
+        this.seenIds.add(item.id);
+        this.items = [{ ...item, expiresAt: now + DISPLAY_DURATION_MS }, ...this.items];
+        changed = true;
+      }
+    }
+    if (changed) this.notify();
+  },
+  
+  cleanup() {
+    const now = Date.now();
+    const filtered = this.items.filter(item => item.expiresAt > now);
+    if (filtered.length !== this.items.length) {
+      this.items = filtered;
+      this.notify();
+    }
+  },
+  
+  notify() {
+    this.listeners.forEach(fn => fn());
+  },
+  
+  subscribe(fn: () => void) {
+    this.listeners.add(fn);
+    return () => { this.listeners.delete(fn); };
+  },
+  
+  getSnapshot() {
+    return this.items;
+  }
+};
+
 function useDisplayQueue(recentResults: QueueLogItem[]) {
-  const [items, setItems] = useState<(QueueLogItem & { expiresAt: number })[]>([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const seenIdsRef = useRef<Set<string>>(new Set());
-  const prevCountRef = useRef(0);
   
   // Periodic tick for countdown + expiry
   useEffect(() => {
     const timer = setInterval(() => {
       setNowMs(Date.now());
+      queueStore.cleanup();
     }, 1000);
     return () => clearInterval(timer);
   }, []);
   
-  // Watch recentResults for new entries
+  // Sync new results into the external store
   useEffect(() => {
-    if (recentResults.length <= prevCountRef.current) return;
-    prevCountRef.current = recentResults.length;
-    
-    const now = Date.now();
-    const newItems: (QueueLogItem & { expiresAt: number })[] = [];
-    
-    for (const item of recentResults) {
-      if (!seenIdsRef.current.has(item.id)) {
-        seenIdsRef.current.add(item.id);
-        newItems.push({ ...item, expiresAt: now + DISPLAY_DURATION_MS });
-      }
-    }
-    
-    if (newItems.length > 0) {
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => setItems(prev => [...newItems, ...prev]), 0);
+    if (recentResults.length > 0) {
+      queueStore.addItems(recentResults);
     }
   }, [recentResults]);
   
-  // Filter expired items from rendered output
+  // Subscribe to store changes
+  const items = useSyncExternalStore(
+    useCallback((cb: () => void) => queueStore.subscribe(cb), []),
+    useCallback(() => queueStore.getSnapshot(), []),
+    useCallback(() => queueStore.getSnapshot(), []),
+  );
+  
+  // Filter expired items for display
   const displayItems = useMemo(() => {
     return items.filter(item => item.expiresAt > nowMs);
   }, [items, nowMs]);

@@ -203,13 +203,15 @@ function SwipeableDateInput({
   
   function handleSegDrag(segment: "month" | "day" | "year", e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
-    const startX = 'touches' in e && e.touches.length > 0 ? e.touches[0]!.clientX : (e as React.MouseEvent).clientX;
+    const touch = 'touches' in e ? e.touches[0] : undefined;
+    const startX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
     const startVal = segment === "month" ? month : segment === "day" ? day : year;
     
     const handleMove = (ev: MouseEvent | TouchEvent) => {
       let currentX: number;
-      if ('touches' in ev && (ev as TouchEvent).touches.length > 0) {
-        currentX = (ev as TouchEvent).touches[0]!.clientX;
+      const moveTouch = 'touches' in ev ? (ev as TouchEvent).touches[0] : undefined;
+      if (moveTouch) {
+        currentX = moveTouch.clientX;
       } else {
         currentX = (ev as MouseEvent).clientX;
       }
