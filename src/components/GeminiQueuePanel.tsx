@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, Zap, Clock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import type { QueueLogItem } from "@/lib/hooks/useMoodAnalysisQueue";
 
 interface GeminiQueuePanelProps {
@@ -27,36 +27,50 @@ function getMoodColorForPanel(mood: string): string {
 const DISPLAY_DURATION_MS = 10_000;
 
 function useDisplayQueue(recentResults: QueueLogItem[]) {
-  const [displayItems, setDisplayItems] = useState<(QueueLogItem & { expiresAt: number })[]>([]);
+  const [items, setItems] = useState<(QueueLogItem & { expiresAt: number })[]>([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const prevCountRef = useRef(0);
   
+  // Periodic tick for countdown + expiry
   useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  // Watch recentResults for new entries
+  useEffect(() => {
+    if (recentResults.length <= prevCountRef.current) return;
+    prevCountRef.current = recentResults.length;
+    
+    const now = Date.now();
     const newItems: (QueueLogItem & { expiresAt: number })[] = [];
+    
     for (const item of recentResults) {
       if (!seenIdsRef.current.has(item.id)) {
         seenIdsRef.current.add(item.id);
-        newItems.push({ ...item, expiresAt: Date.now() + DISPLAY_DURATION_MS });
+        newItems.push({ ...item, expiresAt: now + DISPLAY_DURATION_MS });
       }
     }
+    
     if (newItems.length > 0) {
-      setDisplayItems(prev => [...newItems, ...prev]);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => setItems(prev => [...newItems, ...prev]), 0);
     }
   }, [recentResults]);
   
-  useEffect(() => {
-    if (displayItems.length === 0) return;
-    const timer = setInterval(() => {
-      const now = Date.now();
-      setDisplayItems(prev => prev.filter(item => item.expiresAt > now));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [displayItems.length]);
+  // Filter expired items from rendered output
+  const displayItems = useMemo(() => {
+    return items.filter(item => item.expiresAt > nowMs);
+  }, [items, nowMs]);
   
-  return displayItems;
+  return { displayItems, nowMs };
 }
 
 export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProps) {
-  const displayItems = useDisplayQueue(recentResults);
+  const { displayItems, nowMs } = useDisplayQueue(recentResults);
   const hasActivity = status.pending > 0 || status.processing || displayItems.length > 0;
   
   if (!hasActivity) return null;
@@ -140,7 +154,7 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
             <div className="space-y-2 max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
               <AnimatePresence initial={false}>
                 {displayItems.map((item) => {
-                  const timeLeft = Math.max(0, Math.ceil((item.expiresAt - Date.now()) / 1000));
+                  const timeLeft = Math.max(0, Math.ceil((item.expiresAt - nowMs) / 1000));
                   return (
                     <motion.div
                       key={item.id}
