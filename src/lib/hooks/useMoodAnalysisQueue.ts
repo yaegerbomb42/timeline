@@ -122,6 +122,8 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
               emoji: result.emoji,
               score: result.score,
               rationale: result.rationale,
+              geminiRationale: result.geminiRationale || result.rationale,
+              consciousness: result.consciousness || "neutral observation",
             },
           });
           updated++;
