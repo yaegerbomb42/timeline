@@ -216,7 +216,7 @@ function SwipeableDateInput({
         currentX = (ev as MouseEvent).clientX;
       }
       const dx = currentX - startX;
-      const sensitivity = segment === "year" ? 60 : 30;
+      const sensitivity = segment === "year" ? 30 : 15;
       const delta = Math.round(dx / sensitivity);
       
       if (delta !== 0) {
@@ -260,27 +260,30 @@ function SwipeableDateInput({
   return (
     <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 overflow-hidden select-none">
       <div
+        data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("month", e)}
         onTouchStart={(e) => handleSegDrag("month", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-cyan)] cursor-ew-resize hover:bg-[var(--neon-cyan)]/10 transition-colors"
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-cyan)] cursor-ew-resize hover:bg-[var(--neon-cyan)]/10 hover:scale-110 transition-all active:scale-95"
         title="Drag left/right to change month"
       >
         {monthNames[month]}
       </div>
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
+        data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("day", e)}
         onTouchStart={(e) => handleSegDrag("day", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-purple)] cursor-ew-resize hover:bg-[var(--neon-purple)]/10 transition-colors"
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-purple)] cursor-ew-resize hover:bg-[var(--neon-purple)]/10 hover:scale-110 transition-all active:scale-95"
         title="Drag left/right to change day"
       >
         {String(day).padStart(2, "0")}
       </div>
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
+        data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("year", e)}
         onTouchStart={(e) => handleSegDrag("year", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-pink)] cursor-ew-resize hover:bg-[var(--neon-pink)]/10 transition-colors"
+        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-pink)] cursor-ew-resize hover:bg-[var(--neon-pink)]/10 hover:scale-110 transition-all active:scale-95"
         title="Drag left/right to change year"
       >
         {year}
@@ -392,8 +395,8 @@ export function TimelineBar({
 
   // Mouse drag-to-scroll
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Don't start drag on interactive elements
-    if ((e.target as HTMLElement).closest('button, input, select, a')) return;
+    // Don't start drag on interactive elements or date segments
+    if ((e.target as HTMLElement).closest('button, input, select, a, [data-date-segment]')) return;
     isDraggingRef.current = true;
     dragStartXRef.current = e.clientX;
     scrollStartRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
@@ -743,13 +746,14 @@ export function TimelineBar({
                             />
                             {/* Small date under node */}
                             <div 
-                              className="absolute left-1/2 -translate-x-1/2 text-[8px] font-mono text-[var(--text-secondary)] whitespace-nowrap opacity-70 pointer-events-none"
+                              className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
                               style={{ 
                                 top: dotPx / 2 + 4,
-                                fontSize: Math.max(6, Math.min(8, dotPx * 0.32)),
+                                fontSize: Math.max(10, Math.min(12, dotPx * 0.4)),
+                                textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
                               }}
                             >
-                              {format(day.date, "d")}
+                              {format(day.date, "M/d")}
                             </div>
                           </div>
                         );

@@ -61,8 +61,9 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         let pendingCount = 0;
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
-          // Count entries without mood analysis or with old analysis (no Gemini fields)
-          if (data.text && data.text.trim() && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+          // Skip image-only entries (they don't need AI analysis)
+          // Count entries with text that need mood analysis or with old analysis (no Gemini fields)
+          if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
             pendingCount++;
           }
         });
@@ -189,8 +190,9 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       const pending: PendingEntry[] = [];
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
-        // Check for entries without mood analysis OR without Gemini-enhanced analysis
-        if (data.text && data.text.trim() && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+        // Skip image-only entries (they don't need AI analysis)
+        // Check for entries with text without mood analysis OR without Gemini-enhanced analysis
+        if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
           pending.push({
             id: doc.id,
             text: String(data.text),
