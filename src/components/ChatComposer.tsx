@@ -119,7 +119,7 @@ export function ChatComposer({
 
   async function send(retry = false) {
     const text = value.trim();
-    if (!text) return;
+    if (!text && !imageFile) return;
     
     if (retry) {
       setRetrying(true);
@@ -440,9 +440,9 @@ export function ChatComposer({
             <motion.button
               ref={sendButtonRef}
               onClick={() => void send()}
-              disabled={disabled || busy || !value.trim()}
-              whileHover={!disabled && !busy && value.trim() ? { scale: 1.08, y: -2 } : {}}
-              whileTap={!disabled && !busy && value.trim() ? { scale: 0.95 } : {}}
+              disabled={disabled || busy || (!value.trim() && !imageFile)}
+              whileHover={!disabled && !busy && (value.trim() || imageFile) ? { scale: 1.08, y: -2 } : {}}
+              whileTap={!disabled && !busy && (value.trim() || imageFile) ? { scale: 0.95 } : {}}
               className={cn(
                 "relative inline-flex items-center gap-3 rounded-2xl px-6 py-3 overflow-hidden",
                 "bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)]",

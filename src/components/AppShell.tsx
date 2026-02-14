@@ -803,6 +803,9 @@ export function AppShell() {
             transition={{ delay: 0.4, duration: 0.8 }}
             className="flex flex-col gap-6 mb-10"
           >
+            {/* AI Processing Queue - Top */}
+            <GeminiQueuePanel status={queueStatus} recentResults={recentResults} />
+
             {/* Top: Entry composer */}
             <motion.div
               animate={{
@@ -898,9 +901,6 @@ export function AppShell() {
                 />
               </div>
             </motion.section>
-
-            {/* Gemini Queue Panel */}
-            <GeminiQueuePanel status={queueStatus} recentResults={recentResults} />
 
             {/* Stats bar */}
             <motion.div
