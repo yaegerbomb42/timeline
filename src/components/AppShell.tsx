@@ -15,6 +15,7 @@ import { BatchImportModal } from "@/components/BatchImportModal";
 import { UndoBatchModal } from "@/components/UndoBatchModal";
 import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
 import { BulkDeleteModal } from "@/components/BulkDeleteModal";
+import { GeminiQueuePanel } from "@/components/GeminiQueuePanel";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { addChat, deleteChat, useChats, recalculateMoodRatings } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
@@ -543,7 +544,7 @@ export function AppShell() {
   const { user, loading: authLoading, signOut, isGuest, isAdmin, signInAsAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
   const { aiKey, hydrated: aiKeyHydrated } = useAiKey(user?.uid ?? null);
-  const { status: queueStatus, startQueue, stopQueue } = useMoodAnalysisQueue(
+  const { status: queueStatus, recentResults, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
     aiKey,
     aiKeyHydrated && !!aiKey
@@ -897,6 +898,9 @@ export function AppShell() {
                 />
               </div>
             </motion.section>
+
+            {/* Gemini Queue Panel */}
+            <GeminiQueuePanel status={queueStatus} recentResults={recentResults} />
 
             {/* Stats bar */}
             <motion.div
