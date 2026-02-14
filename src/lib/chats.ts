@@ -71,8 +71,6 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   
   // For image-only entries, skip mood analysis entirely
   // For text entries, skip immediate analysis - let the queue handle it
-  const mood = undefined; // Queue will handle mood analysis
-  const moodAnalysis = undefined; // Queue will handle mood analysis
   
   // Upload image to Firebase Storage if provided
   let imageUrl: string | undefined = undefined;
@@ -94,8 +92,6 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
     text,
     excerpt,
     dayKey,
-    mood,
-    moodAnalysis,
     createdAtLocal: now.toISOString(),
     createdAt: serverTimestamp(),
     v: 1,
@@ -720,5 +716,4 @@ export async function recalculateMoodRatings(uid: string, onProgress?: (current:
   
   return updated;
 }
-
 
