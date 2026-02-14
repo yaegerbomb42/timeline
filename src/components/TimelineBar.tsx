@@ -47,6 +47,13 @@ function getDynamicNodeSize(visibleCount: number): number {
   return 26;
 }
 
+// Scaling constants for dynamic font/stroke sizing
+const NODE_FONT_SIZE_RATIO = 0.38;   // Font size as proportion of node diameter
+const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
+const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
+const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
+const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
+
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
   return COASTER_BOTTOM - ((rating - 1) / 99) * COASTER_RANGE;
@@ -138,8 +145,9 @@ const GlowingDot = memo(function GlowingDot({
       >
         {/* Rating number inside circle */}
         <span 
-          className="text-[9px] font-bold font-mono pointer-events-none"
+          className="font-bold font-mono pointer-events-none"
           style={{
+            fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
             color: 'rgba(255, 255, 255, 0.95)',
             textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
           }}
@@ -224,7 +232,7 @@ export function TimelineBar({
     const available = viewportWidth || 600;
     
     // Distribute width evenly across all visible days to fill viewport
-    const slot = Math.max(8, available / count);
+    const slot = Math.max(MIN_SLOT_WIDTH_PX, available / count);
     const track = slot * count;
     
     // Label stride adapts to available space per slot
@@ -484,7 +492,7 @@ export function TimelineBar({
                   return path;
                 })()}
                 stroke="url(#rollercoaster-gradient)"
-                strokeWidth={Math.max(2, Math.min(6, slotWidth / 8))}
+                strokeWidth={Math.max(MIN_STROKE_WIDTH, Math.min(MAX_STROKE_WIDTH, slotWidth / STROKE_SLOT_RATIO))}
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
