@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { doc, collection, query, where, getDocs, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, collection, query, getDocs, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { MoodAnalysis } from "@/lib/sentiment";
 
@@ -219,6 +219,31 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   const stopQueue = useCallback(() => {
     abortRef.current = true;
   }, []);
+
+  // Auto-start processing when there are pending entries and we have an API key
+  const autoStartRef = useRef(false);
+  useEffect(() => {
+    if (
+      enabled &&
+      uid &&
+      apiKey &&
+      status.pending > 0 &&
+      !status.processing &&
+      !processingRef.current &&
+      !autoStartRef.current
+    ) {
+      autoStartRef.current = true;
+      // Small delay to avoid rapid re-triggers
+      const timer = setTimeout(() => {
+        void processQueue();
+        autoStartRef.current = false;
+      }, 2000);
+      return () => {
+        clearTimeout(timer);
+        autoStartRef.current = false;
+      };
+    }
+  }, [enabled, uid, apiKey, status.pending, status.processing, processQueue]);
 
   return {
     status,

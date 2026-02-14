@@ -546,7 +546,7 @@ export function AppShell() {
   const { status: queueStatus, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
     aiKey,
-    isAdmin && aiKeyHydrated
+    aiKeyHydrated && !!aiKey
   );
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");

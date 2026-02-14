@@ -28,8 +28,21 @@ export function Minimap({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, startIdx: 0, endIdx: 0 });
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  const width = containerRef.current?.clientWidth || 0;
+  // Track container width with ResizeObserver for dynamic resizing
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const width = containerWidth;
   const viewWindowLeft = totalDays > 0 ? (visibleStartIdx / totalDays) * width : 0;
   const viewWindowWidth = totalDays > 0 ? ((visibleEndIdx - visibleStartIdx) / totalDays) * width : 0;
   

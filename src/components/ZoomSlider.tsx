@@ -47,7 +47,6 @@ export function ZoomSlider({
     if (!visibleDaysCount || !totalDays) return "";
     if (visibleDaysCount >= totalDays) return "Entire timeline";
     
-    const percentage = (visibleDaysCount / totalDays) * 100;
     if (visibleDaysCount === 1) return "1 day";
     if (visibleDaysCount < 7) return `${visibleDaysCount} days`;
     if (visibleDaysCount < 30) {
@@ -94,7 +93,7 @@ export function ZoomSlider({
       </div>
 
       {/* Slider */}
-      <div className="flex-1 relative group">
+      <div className="flex-1 relative">
         <input
           type="range"
           min={minZoom}
@@ -112,22 +111,16 @@ export function ZoomSlider({
           }}
           aria-label="Zoom level"
         />
-        
-        {/* Tooltip with visible range */}
-        {visibleDaysCount && totalDays && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-          >
-            <div className="px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--neon-cyan)]/30 backdrop-blur-xl shadow-lg">
-              <span className="text-xs font-sans text-[var(--text-secondary)] whitespace-nowrap">
-                Showing {getVisibleRangeText()}
-              </span>
-            </div>
-          </motion.div>
-        )}
       </div>
+
+      {/* Visible Range Display - always visible */}
+      {visibleDaysCount !== undefined && totalDays !== undefined && totalDays > 0 && (
+        <div className="flex items-center gap-1.5 min-w-[100px]">
+          <span className="text-xs font-mono font-semibold text-[var(--neon-cyan)] whitespace-nowrap">
+            {getVisibleRangeText()}
+          </span>
+        </div>
+      )}
 
       {/* Zoom In Button */}
       <motion.button
@@ -145,13 +138,6 @@ export function ZoomSlider({
       >
         <Plus className="h-4 w-4 text-[var(--text-primary)]" />
       </motion.button>
-
-      {/* Zoom Range Labels */}
-      <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-wider">
-        <span>{minZoom}x</span>
-        <span className="text-[var(--text-muted)]">→</span>
-        <span>{maxZoom}x</span>
-      </div>
     </motion.div>
   );
 }
