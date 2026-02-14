@@ -1,16 +1,29 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Flame, Hourglass, ListChecks, Zap } from "lucide-react";
+import { Flame, Hourglass, ListChecks, Zap, Heart } from "lucide-react";
 
 export type StatsSnapshot = {
   totalEntries: number;
   totalDays: number;
   streakDays: number;
   engagement: string;
+  avgMoodRating: number; // Average mood rating 1-100
 };
 
 export function StatsBar({ stats }: { stats: StatsSnapshot }) {
+  // Determine mood color from average rating using the same scale as the timeline
+  const moodColor = stats.avgMoodRating > 60
+    ? "var(--neon-cyan)"
+    : stats.avgMoodRating < 40
+      ? "var(--neon-pink)"
+      : "var(--neon-purple)";
+  const moodGlow = stats.avgMoodRating > 60
+    ? "var(--glow-cyan)"
+    : stats.avgMoodRating < 40
+      ? "var(--glow-pink)"
+      : "var(--glow-purple)";
+
   const items = [
     {
       icon: <ListChecks className="h-5 w-5" />,
@@ -18,6 +31,13 @@ export function StatsBar({ stats }: { stats: StatsSnapshot }) {
       value: stats.totalEntries.toLocaleString(),
       color: "var(--neon-cyan)",
       glow: "var(--glow-cyan)",
+    },
+    {
+      icon: <Heart className="h-5 w-5" />,
+      label: "Avg mood",
+      value: stats.avgMoodRating > 0 ? `${stats.avgMoodRating}/100` : "—",
+      color: moodColor,
+      glow: moodGlow,
     },
     {
       icon: <Flame className="h-5 w-5" />,

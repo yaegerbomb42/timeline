@@ -4,12 +4,10 @@ import { format, parse, isAfter, isBefore, startOfDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
-import Image from "next/image";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
-import { getMoodColor } from "@/lib/sentiment";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
 
 type DayBucket = {
@@ -50,7 +48,20 @@ function getDynamicNodeSize(visibleCount: number): number {
 
 // Scaling constants for dynamic font/stroke sizing
 const NODE_FONT_SIZE_RATIO = 0.38;   // Font size as proportion of node diameter
-const DATE_LABEL_FONT_SIZE_RATIO = 0.4;  // Date label font size as proportion of node diameter
+
+// Convert a rating (1-100) to the same color used by the rollercoaster gradient line
+function ratingToColor(rating: number): string {
+  if (rating < 40) {
+    const intensity = (40 - rating) / 40;
+    return `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
+  } else if (rating > 60) {
+    const intensity = (rating - 60) / 40;
+    return `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
+  } else {
+    const neutralPos = (rating - 40) / 20;
+    return `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
+  }
+}
 const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
@@ -151,14 +162,13 @@ const GlowingDot = memo(function GlowingDot({
   size: number;
   yOffset: number;
 }) {
-  const moodColor = chat.moodAnalysis ? getMoodColor(chat.moodAnalysis.mood) : '#00f5ff';
-  const moodColorRgba = chat.moodAnalysis 
-    ? (chat.moodAnalysis.mood === 'positive' ? 'rgba(0,255,136,0.6)' : 
-       chat.moodAnalysis.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
-       'rgba(0,245,255,0.6)')
-    : 'rgba(0,245,255,0.6)';
-  
   const rating = chat.moodAnalysis?.rating ?? 50;
+  const moodColor = ratingToColor(rating);
+  // Parse the rgb color to create an rgba version for glow effects
+  const rgbMatch = moodColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  const moodColorRgba = rgbMatch 
+    ? `rgba(${rgbMatch[1]},${rgbMatch[2]},${rgbMatch[3]},0.6)`
+    : 'rgba(0,245,255,0.6)';
   
   const handleClick = () => {
     if (onClick) {
@@ -444,27 +454,32 @@ export function TimelineBar({
 
   // Keyboard shortcuts: arrow keys to scroll
   useEffect(() => {
+    const scrollElement = scrollContainerRef.current;
+    if (!scrollElement) return;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
-      const scrollElement = scrollContainerRef.current;
-      if (!scrollElement) return;
-      
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        scrollElement.scrollLeft -= slotWidth * 5;
+        scrollElement.scrollBy({ left: -slotWidth * 5, behavior: 'smooth' });
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        scrollElement.scrollLeft += slotWidth * 5;
+        scrollElement.scrollBy({ left: slotWidth * 5, behavior: 'smooth' });
       } else if (e.key === 'Home') {
         e.preventDefault();
-        scrollElement.scrollLeft = 0;
+        scrollElement.scrollTo({ left: 0, behavior: 'smooth' });
       } else if (e.key === 'End') {
         e.preventDefault();
-        scrollElement.scrollLeft = scrollElement.scrollWidth;
+        scrollElement.scrollTo({ left: scrollElement.scrollWidth, behavior: 'smooth' });
       }
     };
 
+    // Listen on both the scroll container and window for keyboard events
+    scrollElement.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      scrollElement.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [slotWidth]);
 
   // Mouse drag-to-scroll
@@ -586,13 +601,15 @@ export function TimelineBar({
       >
         <div
           ref={scrollContainerRef}
-          className="relative h-full overflow-auto"
+          className="relative h-full overflow-x-auto overflow-y-hidden"
+          tabIndex={0}
           style={{
             minHeight: MIN_TIMELINE_HEIGHT,
             width: '100%',
             scrollbarWidth: "thin",
             scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
             cursor: 'grab',
+            outline: 'none',
           }}
           onMouseDown={handleMouseDown}
         >
@@ -859,28 +876,21 @@ export function TimelineBar({
                                   height: dotPx,
                                 }}
                               >
-                                <Image
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
                                   src={representativeChat.imageUrl}
                                   alt="Entry"
                                   width={dotPx}
                                   height={dotPx}
                                   className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
                                   style={{
+                                    width: dotPx,
+                                    height: dotPx,
                                     boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
                                   }}
+                                  loading="lazy"
                                 />
                               </motion.div>
-                              {/* Small date under node */}
-                              <div 
-                                className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
-                                style={{ 
-                                  top: dotPx / 2 + 4,
-                                  fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
-                                  textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
-                                }}
-                              >
-                                {format(day.date, "M/d")}
-                              </div>
                             </div>
                           );
                         }
@@ -905,17 +915,6 @@ export function TimelineBar({
                               size={dotPx}
                               yOffset={0}
                             />
-                            {/* Small date under node */}
-                            <div 
-                              className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
-                              style={{ 
-                                top: dotPx / 2 + 4,
-                                fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
-                                textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
-                              }}
-                            >
-                              {format(day.date, "M/d")}
-                            </div>
                           </div>
                         );
                       })()}

@@ -253,6 +253,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   }, []);
 
   // Auto-start processing when there are pending entries and we have an API key
+  // Uses a ref to track if a start timer is pending, resets after each cycle
   const autoStartRef = useRef(false);
   useEffect(() => {
     if (
@@ -267,13 +268,17 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       autoStartRef.current = true;
       // Small delay to avoid rapid re-triggers
       const timer = setTimeout(() => {
-        void processQueue();
         autoStartRef.current = false;
+        void processQueue();
       }, 2000);
       return () => {
         clearTimeout(timer);
         autoStartRef.current = false;
       };
+    }
+    // Reset auto-start flag when processing completes so new entries can trigger it
+    if (!status.processing && !processingRef.current) {
+      autoStartRef.current = false;
     }
   }, [enabled, uid, apiKey, status.pending, status.processing, processQueue]);
 
