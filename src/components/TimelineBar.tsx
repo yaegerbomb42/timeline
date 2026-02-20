@@ -4,12 +4,10 @@ import { format, parse, isAfter, isBefore, startOfDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
-import Image from "next/image";
 
 import type { Chat } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
-import { getMoodColor } from "@/lib/sentiment";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
 
 type DayBucket = {
@@ -50,7 +48,20 @@ function getDynamicNodeSize(visibleCount: number): number {
 
 // Scaling constants for dynamic font/stroke sizing
 const NODE_FONT_SIZE_RATIO = 0.38;   // Font size as proportion of node diameter
-const DATE_LABEL_FONT_SIZE_RATIO = 0.4;  // Date label font size as proportion of node diameter
+
+// Convert a rating (1-100) to the same color used by the rollercoaster gradient line
+function ratingToColor(rating: number): string {
+  if (rating < 40) {
+    const intensity = (40 - rating) / 40;
+    return `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
+  } else if (rating > 60) {
+    const intensity = (rating - 60) / 40;
+    return `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
+  } else {
+    const neutralPos = (rating - 40) / 20;
+    return `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
+  }
+}
 const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
@@ -151,14 +162,13 @@ const GlowingDot = memo(function GlowingDot({
   size: number;
   yOffset: number;
 }) {
-  const moodColor = chat.moodAnalysis ? getMoodColor(chat.moodAnalysis.mood) : '#00f5ff';
-  const moodColorRgba = chat.moodAnalysis 
-    ? (chat.moodAnalysis.mood === 'positive' ? 'rgba(0,255,136,0.6)' : 
-       chat.moodAnalysis.mood === 'negative' ? 'rgba(255,107,157,0.6)' : 
-       'rgba(0,245,255,0.6)')
-    : 'rgba(0,245,255,0.6)';
-  
   const rating = chat.moodAnalysis?.rating ?? 50;
+  const moodColor = ratingToColor(rating);
+  // Parse the rgb color to create an rgba version for glow effects
+  const rgbMatch = moodColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  const moodColorRgba = rgbMatch 
+    ? `rgba(${rgbMatch[1]},${rgbMatch[2]},${rgbMatch[3]},0.6)`
+    : 'rgba(0,245,255,0.6)';
   
   const handleClick = () => {
     if (onClick) {
@@ -262,7 +272,20 @@ function SwipeableDateInput({
   const day = parsed ? parsed.getDate() : 1;
   const year = parsed ? parsed.getFullYear() : new Date().getFullYear();
   
+  // Track which segment is currently being dragged for visual feedback
+  const [activeSegment, setActiveSegment] = useState<"month" | "day" | "year" | null>(null);
+  
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  
+  // Use refs to hold the latest values so the mousemove closure always has current data
+  const latestMonth = useRef(month);
+  const latestDay = useRef(day);
+  const latestYear = useRef(year);
+  useEffect(() => {
+    latestMonth.current = month;
+    latestDay.current = day;
+    latestYear.current = year;
+  }, [month, day, year]);
   
   function clampDate(y: number, m: number, d: number): string {
     m = Math.max(0, Math.min(11, m));
@@ -277,11 +300,16 @@ function SwipeableDateInput({
   
   function handleSegDrag(segment: "month" | "day" | "year", e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
+    e.stopPropagation();
     const touch = 'touches' in e ? e.touches[0] : undefined;
     const startX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
     const startVal = segment === "month" ? month : segment === "day" ? day : year;
+    let lastDelta = 0;
+    
+    setActiveSegment(segment);
     
     const handleMove = (ev: MouseEvent | TouchEvent) => {
+      ev.preventDefault();
       let currentX: number;
       const moveTouch = 'touches' in ev ? (ev as TouchEvent).touches[0] : undefined;
       if (moveTouch) {
@@ -290,11 +318,17 @@ function SwipeableDateInput({
         currentX = (ev as MouseEvent).clientX;
       }
       const dx = currentX - startX;
-      const sensitivity = segment === "year" ? 30 : 15;
+      // Lower sensitivity = easier to drag. Year needs more precision.
+      const sensitivity = segment === "year" ? 25 : 12;
       const delta = Math.round(dx / sensitivity);
       
-      if (delta !== 0) {
-        let newMonth = month, newDay = day, newYear = year;
+      // Only fire onChange when delta actually changes to avoid redundant updates
+      if (delta !== lastDelta) {
+        lastDelta = delta;
+        // Use refs for the OTHER two segments to get latest values
+        let newMonth = latestMonth.current;
+        let newDay = latestDay.current;
+        let newYear = latestYear.current;
         if (segment === "month") newMonth = startVal + delta;
         else if (segment === "day") newDay = startVal + delta;
         else newYear = startVal + delta;
@@ -305,15 +339,16 @@ function SwipeableDateInput({
     };
     
     const handleUp = () => {
+      setActiveSegment(null);
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleUp);
     };
     
-    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mousemove", handleMove, { passive: false });
     window.addEventListener("mouseup", handleUp);
-    window.addEventListener("touchmove", handleMove);
+    window.addEventListener("touchmove", handleMove, { passive: false });
     window.addEventListener("touchend", handleUp);
   }
   
@@ -337,7 +372,12 @@ function SwipeableDateInput({
         data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("month", e)}
         onTouchStart={(e) => handleSegDrag("month", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-cyan)] cursor-ew-resize hover:bg-[var(--neon-cyan)]/10 hover:scale-110 transition-all active:scale-95"
+        className={cn(
+          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
+          activeSegment === "month"
+            ? "bg-[var(--neon-cyan)]/20 scale-110 text-[var(--neon-cyan)]"
+            : "text-[var(--neon-cyan)] hover:bg-[var(--neon-cyan)]/10 hover:scale-110 active:scale-95"
+        )}
         title="Drag left/right to change month"
       >
         {monthNames[month]}
@@ -347,7 +387,12 @@ function SwipeableDateInput({
         data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("day", e)}
         onTouchStart={(e) => handleSegDrag("day", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-purple)] cursor-ew-resize hover:bg-[var(--neon-purple)]/10 hover:scale-110 transition-all active:scale-95"
+        className={cn(
+          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
+          activeSegment === "day"
+            ? "bg-[var(--neon-purple)]/20 scale-110 text-[var(--neon-purple)]"
+            : "text-[var(--neon-purple)] hover:bg-[var(--neon-purple)]/10 hover:scale-110 active:scale-95"
+        )}
         title="Drag left/right to change day"
       >
         {String(day).padStart(2, "0")}
@@ -357,7 +402,12 @@ function SwipeableDateInput({
         data-date-segment="true"
         onMouseDown={(e) => handleSegDrag("year", e)}
         onTouchStart={(e) => handleSegDrag("year", e)}
-        className="px-1.5 py-1 text-xs font-mono text-[var(--neon-pink)] cursor-ew-resize hover:bg-[var(--neon-pink)]/10 hover:scale-110 transition-all active:scale-95"
+        className={cn(
+          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
+          activeSegment === "year"
+            ? "bg-[var(--neon-pink)]/20 scale-110 text-[var(--neon-pink)]"
+            : "text-[var(--neon-pink)] hover:bg-[var(--neon-pink)]/10 hover:scale-110 active:scale-95"
+        )}
         title="Drag left/right to change year"
       >
         {year}
@@ -444,37 +494,54 @@ export function TimelineBar({
 
   // Keyboard shortcuts: arrow keys to scroll
   useEffect(() => {
+    const scrollElement = scrollContainerRef.current;
+    if (!scrollElement) return;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
-      const scrollElement = scrollContainerRef.current;
-      if (!scrollElement) return;
-      
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        scrollElement.scrollLeft -= slotWidth * 5;
+        scrollElement.scrollBy({ left: -slotWidth * 5, behavior: 'smooth' });
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        scrollElement.scrollLeft += slotWidth * 5;
+        scrollElement.scrollBy({ left: slotWidth * 5, behavior: 'smooth' });
       } else if (e.key === 'Home') {
         e.preventDefault();
-        scrollElement.scrollLeft = 0;
+        scrollElement.scrollTo({ left: 0, behavior: 'smooth' });
       } else if (e.key === 'End') {
         e.preventDefault();
-        scrollElement.scrollLeft = scrollElement.scrollWidth;
+        scrollElement.scrollTo({ left: scrollElement.scrollWidth, behavior: 'smooth' });
       }
     };
 
+    // Listen on both the scroll container and window for keyboard events
+    scrollElement.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      scrollElement.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [slotWidth]);
 
-  // Mouse drag-to-scroll
+  // Mouse and touch drag-to-scroll
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't start drag on interactive elements or date segments
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-date-segment]')) return;
     isDraggingRef.current = true;
     dragStartXRef.current = e.clientX;
     scrollStartRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = 'grabbing';
+    }
     e.preventDefault();
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button, input, select, a, [data-date-segment]')) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = touch.clientX;
+    scrollStartRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
   }, []);
 
   useEffect(() => {
@@ -483,14 +550,28 @@ export function TimelineBar({
       const dx = e.clientX - dragStartXRef.current;
       scrollContainerRef.current.scrollLeft = scrollStartRef.current - dx;
     };
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current || !scrollContainerRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      const dx = touch.clientX - dragStartXRef.current;
+      scrollContainerRef.current.scrollLeft = scrollStartRef.current - dx;
+    };
+    const handleEnd = () => {
       isDraggingRef.current = false;
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.cursor = 'grab';
+      }
     };
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleEnd);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
     };
   }, []);
 
@@ -586,15 +667,18 @@ export function TimelineBar({
       >
         <div
           ref={scrollContainerRef}
-          className="relative h-full overflow-auto"
+          className="relative h-full overflow-x-auto overflow-y-hidden"
+          tabIndex={0}
           style={{
             minHeight: MIN_TIMELINE_HEIGHT,
             width: '100%',
             scrollbarWidth: "thin",
             scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
             cursor: 'grab',
+            outline: 'none',
           }}
           onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
         >
           <div
             className="relative"
@@ -859,28 +943,19 @@ export function TimelineBar({
                                   height: dotPx,
                                 }}
                               >
-                                <Image
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
                                   src={representativeChat.imageUrl}
                                   alt="Entry"
-                                  width={dotPx}
-                                  height={dotPx}
                                   className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
                                   style={{
+                                    width: dotPx,
+                                    height: dotPx,
                                     boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
                                   }}
+                                  loading="lazy"
                                 />
                               </motion.div>
-                              {/* Small date under node */}
-                              <div 
-                                className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
-                                style={{ 
-                                  top: dotPx / 2 + 4,
-                                  fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
-                                  textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
-                                }}
-                              >
-                                {format(day.date, "M/d")}
-                              </div>
                             </div>
                           );
                         }
@@ -905,17 +980,6 @@ export function TimelineBar({
                               size={dotPx}
                               yOffset={0}
                             />
-                            {/* Small date under node */}
-                            <div 
-                              className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap pointer-events-none font-semibold"
-                              style={{ 
-                                top: dotPx / 2 + 4,
-                                fontSize: Math.max(10, Math.min(12, dotPx * DATE_LABEL_FONT_SIZE_RATIO)),
-                                textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
-                              }}
-                            >
-                              {format(day.date, "M/d")}
-                            </div>
                           </div>
                         );
                       })()}

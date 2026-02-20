@@ -611,7 +611,13 @@ export function AppShell() {
       }
       return s;
     })();
-    return { totalEntries, totalDays, streakDays: streak, engagement: stats.pretty };
+    return { totalEntries, totalDays, streakDays: streak, engagement: stats.pretty, avgMoodRating: (() => {
+      const ratings = chats
+        .filter(c => !c.imageOnly && c.moodAnalysis?.rating != null)
+        .map(c => c.moodAnalysis!.rating);
+      if (ratings.length === 0) return 0;
+      return Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length);
+    })() };
   }, [chats, stats.pretty]);
 
   if (authLoading) {
