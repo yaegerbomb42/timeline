@@ -25,6 +25,7 @@ function getMoodColorForPanel(mood: string): string {
 }
 
 const DISPLAY_DURATION_MS = 10_000;
+const MAX_DISPLAY_ITEMS = 5; // Cap visible items to avoid overwhelming with hundreds in queue
 
 // External store for tracking seen IDs and display items
 // This avoids calling setState in effects which violates react-hooks/set-state-in-effect
@@ -95,9 +96,9 @@ function useDisplayQueue(recentResults: QueueLogItem[]) {
     useCallback(() => queueStore.getSnapshot(), []),
   );
   
-  // Filter expired items for display
+  // Filter expired items for display and cap at MAX_DISPLAY_ITEMS
   const displayItems = useMemo(() => {
-    return items.filter(item => item.expiresAt > nowMs);
+    return items.filter(item => item.expiresAt > nowMs).slice(0, MAX_DISPLAY_ITEMS);
   }, [items, nowMs]);
   
   return { displayItems, nowMs };
@@ -125,7 +126,7 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
             <Brain className="h-4 w-4 text-[var(--neon-purple)]" />
           </motion.div>
           <span className="text-sm font-sans font-semibold text-[var(--text-primary)]">
-            Queue Processor
+            AI Queue Processor
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">
@@ -173,118 +174,73 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
         </div>
       )}
 
-      {/* Two-column layout: Left = Queue / Right = Analysis */}
+      {/* Queue items - each shows entry text + analysis for 10 seconds */}
       {(displayItems.length > 0 || status.processing) && (
-        <div className="grid grid-cols-2 divide-x divide-[var(--line)] min-h-[120px]">
-          {/* Left column: Queue items being processed */}
-          <div className="p-4">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-sans mb-3 flex items-center gap-1.5">
-              <Loader2 className="h-3 w-3 animate-spin text-[var(--neon-purple)]" />
-              Queue
-            </div>
-            <div className="space-y-2 max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-              <AnimatePresence initial={false}>
-                {displayItems.map((item) => {
-                  const timeLeft = Math.max(0, Math.ceil((item.expiresAt - nowMs) / 1000));
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="flex items-center gap-2 rounded-lg bg-[var(--bg-surface)]/60 px-3 py-2 border border-[var(--line)]/30"
-                    >
-                      <div
-                        className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono border"
-                        style={{
-                          background: `${getMoodColorForPanel(item.mood)}15`,
-                          borderColor: `${getMoodColorForPanel(item.mood)}40`,
-                          color: getMoodColorForPanel(item.mood),
-                        }}
-                      >
-                        {item.rating}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-mono text-[var(--text-muted)]">{item.date}</div>
-                        <div className="text-xs text-[var(--text-secondary)] truncate">{item.description}</div>
-                      </div>
-                      <div className="text-[9px] font-mono text-[var(--text-muted)]">{timeLeft}s</div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-              {displayItems.length === 0 && status.processing && (
+        <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+          {displayItems.length === 0 && status.processing && (
+            <motion.div
+              animate={{ opacity: [0.3, 0.7, 0.3] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-xs text-[var(--text-muted)] font-sans py-4 text-center flex items-center justify-center gap-2"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Analyzing entries...
+            </motion.div>
+          )}
+          <AnimatePresence initial={false}>
+            {displayItems.map((item) => {
+              const timeLeft = Math.max(0, Math.ceil((item.expiresAt - nowMs) / 1000));
+              const moodColor = getMoodColorForPanel(item.mood);
+              return (
                 <motion.div
-                  animate={{ opacity: [0.3, 0.7, 0.3] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="text-xs text-[var(--text-muted)] font-sans py-4 text-center"
+                  key={item.id}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="rounded-xl bg-[var(--bg-surface)]/50 border border-[var(--line)]/40 overflow-hidden"
                 >
-                  Analyzing entries...
-                </motion.div>
-              )}
-            </div>
-          </div>
+                  {/* Entry text being analyzed */}
+                  <div className="px-4 py-3 border-b border-[var(--line)]/20 bg-[var(--bg-surface)]/30">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-mono text-[var(--text-muted)]">{item.date}</span>
+                      <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-surface)]/60 px-1.5 py-0.5 rounded">{timeLeft}s</span>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3">
+                      {item.text || item.description}
+                    </p>
+                  </div>
 
-          {/* Right column: Analysis results */}
-          <div className="p-4">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-sans mb-3 flex items-center gap-1.5">
-              <Brain className="h-3 w-3 text-[var(--neon-cyan)]" />
-              Analysis
-            </div>
-            <div className="space-y-3 max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-              <AnimatePresence initial={false}>
-                {displayItems.map((item) => (
-                  <motion.div
-                    key={`analysis-${item.id}`}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="rounded-lg bg-[var(--bg-surface)]/40 px-3 py-2 border border-[var(--line)]/30"
-                  >
-                    {/* Score and emoji header */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-sm">{item.emoji}</span>
+                  {/* Analysis result */}
+                  <div className="px-4 py-3">
+                    {/* Score header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-base">{item.emoji}</span>
                       <span
-                        className="text-xs font-bold font-mono"
-                        style={{ color: getMoodColorForPanel(item.mood) }}
+                        className="text-sm font-bold font-mono"
+                        style={{ color: moodColor }}
                       >
                         {item.rating}/100
                       </span>
-                      {item.consciousness && (
-                        <span className="text-[9px] text-[var(--text-muted)] italic ml-auto bg-[var(--bg-surface)]/60 px-1.5 py-0.5 rounded">
-                          {item.consciousness}
-                        </span>
-                      )}
                     </div>
                     
-                    {/* Big rationale */}
-                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-1.5 line-clamp-4">
+                    {/* Paragraph analysis - noteworthy thoughts */}
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-2">
                       {item.geminiRationale}
                     </p>
                     
-                    {/* Small permanent sentence summary */}
+                    {/* Sentence summary */}
                     <div 
-                      className="text-[10px] font-semibold border-t border-[var(--line)]/30 pt-1.5"
-                      style={{ color: getMoodColorForPanel(item.mood) }}
+                      className="text-[11px] font-semibold border-t border-[var(--line)]/30 pt-2"
+                      style={{ color: moodColor }}
                     >
                       {item.description}
                     </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {displayItems.length === 0 && status.processing && (
-                <motion.div
-                  animate={{ opacity: [0.3, 0.7, 0.3] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="text-xs text-[var(--text-muted)] font-sans py-4 text-center"
-                >
-                  Waiting for results...
+                  </div>
                 </motion.div>
-              )}
-            </div>
-          </div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
     </motion.div>

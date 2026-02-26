@@ -6,6 +6,7 @@ import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
 
 import type { Chat } from "@/lib/chats";
+import { updateMoodRating } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
@@ -153,6 +154,7 @@ const GlowingDot = memo(function GlowingDot({
   onShowRationale,
   size,
   yOffset,
+  uid,
 }: {
   chat: Chat;
   isNewest?: boolean;
@@ -161,9 +163,13 @@ const GlowingDot = memo(function GlowingDot({
   onShowRationale?: () => void;
   size: number;
   yOffset: number;
+  uid?: string;
 }) {
   const rating = chat.moodAnalysis?.rating ?? 50;
-  const moodColor = ratingToColor(rating);
+  const [dragRating, setDragRating] = useState<number | null>(null);
+  const isDraggingRatingRef = useRef(false);
+  const displayRating = dragRating !== null ? dragRating : rating;
+  const moodColor = ratingToColor(displayRating);
   // Parse the rgb color to create an rgba version for glow effects
   const rgbMatch = moodColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
   const moodColorRgba = rgbMatch 
@@ -171,6 +177,7 @@ const GlowingDot = memo(function GlowingDot({
     : 'rgba(0,245,255,0.6)';
   
   const handleClick = () => {
+    if (isDraggingRatingRef.current) return;
     if (onClick) {
       onClick();
     }
@@ -182,6 +189,53 @@ const GlowingDot = memo(function GlowingDot({
       onShowRationale();
     }
   };
+  
+  // Drag-to-adjust rating: drag up to increase, down to decrease
+  const latestDragRatingRef = useRef<number | null>(null);
+  const handleRatingDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = 'touches' in e ? e.touches[0] : undefined;
+    const startY = touch ? touch.clientY : (e as React.MouseEvent).clientY;
+    const startRating = rating;
+    isDraggingRatingRef.current = true;
+    
+    const handleMove = (ev: MouseEvent | TouchEvent) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const moveTouch = 'touches' in ev ? (ev as TouchEvent).touches[0] : undefined;
+      const currentY = moveTouch ? moveTouch.clientY : (ev as MouseEvent).clientY;
+      // Drag up = increase rating, drag down = decrease
+      const dy = startY - currentY;
+      const sensitivity = 2; // pixels per rating point
+      const delta = Math.round(dy / sensitivity);
+      const newRating = Math.max(1, Math.min(100, startRating + delta));
+      latestDragRatingRef.current = newRating;
+      setDragRating(newRating);
+    };
+    
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleUp);
+      
+      // Persist the new rating using the ref to get the latest value
+      const finalRating = latestDragRatingRef.current;
+      if (uid && finalRating !== null && finalRating !== startRating) {
+        void updateMoodRating(uid, chat.id, finalRating);
+      }
+      latestDragRatingRef.current = null;
+      setDragRating(null);
+      // Delay clearing the drag flag so onClick doesn't fire
+      setTimeout(() => { isDraggingRatingRef.current = false; }, 50);
+    };
+    
+    window.addEventListener("mousemove", handleMove, { passive: false });
+    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleUp);
+  }, [rating, uid, chat.id]);
     
   return (
     <div className="relative group/dot">
@@ -190,7 +244,7 @@ const GlowingDot = memo(function GlowingDot({
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         aria-label={`${format(chat.createdAt, "MMMM d, yyyy 'at' h:mm a")}${chat.moodAnalysis ? `, Mood: ${chat.moodAnalysis.description}, Rating: ${chat.moodAnalysis.rating} out of 100` : ''}`}
-        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}\n\nDouble-click for detailed analysis`}
+        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}\n\nDrag rating up/down to adjust\nDouble-click for detailed analysis`}
         initial={{ opacity: 0, scale: 0.3, y: 10 }}
         animate={{
           opacity: 1,
@@ -227,16 +281,19 @@ const GlowingDot = memo(function GlowingDot({
             : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
-        {/* Rating number inside circle */}
+        {/* Rating number inside circle - draggable up/down */}
         <span 
-          className="font-bold font-mono pointer-events-none"
+          className="font-bold font-mono select-none"
           style={{
             fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
-            color: 'rgba(255, 255, 255, 0.95)',
+            color: dragRating !== null ? 'rgba(255, 255, 100, 1)' : 'rgba(255, 255, 255, 0.95)',
             textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
+            cursor: 'ns-resize',
           }}
+          onMouseDown={handleRatingDragStart}
+          onTouchStart={handleRatingDragStart}
         >
-          {rating}
+          {displayRating}
         </span>
         {isNewest && (
           <motion.div
@@ -274,6 +331,9 @@ function SwipeableDateInput({
   
   // Track which segment is currently being dragged for visual feedback
   const [activeSegment, setActiveSegment] = useState<"month" | "day" | "year" | null>(null);
+  // Track whether native date input is shown
+  const [showNativeInput, setShowNativeInput] = useState(false);
+  const nativeInputRef = useRef<HTMLInputElement>(null);
   
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   
@@ -286,6 +346,13 @@ function SwipeableDateInput({
     latestDay.current = day;
     latestYear.current = year;
   }, [month, day, year]);
+  
+  // Focus native input when shown
+  useEffect(() => {
+    if (showNativeInput && nativeInputRef.current) {
+      nativeInputRef.current.focus();
+    }
+  }, [showNativeInput]);
   
   function clampDate(y: number, m: number, d: number): string {
     m = Math.max(0, Math.min(11, m));
@@ -305,6 +372,7 @@ function SwipeableDateInput({
     const startX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
     const startVal = segment === "month" ? month : segment === "day" ? day : year;
     let lastDelta = 0;
+    let moved = false;
     
     setActiveSegment(segment);
     
@@ -321,6 +389,8 @@ function SwipeableDateInput({
       // Lower sensitivity = easier to drag. Year needs more precision.
       const sensitivity = segment === "year" ? 25 : 12;
       const delta = Math.round(dx / sensitivity);
+      
+      if (Math.abs(dx) > 3) moved = true;
       
       // Only fire onChange when delta actually changes to avoid redundant updates
       if (delta !== lastDelta) {
@@ -344,6 +414,10 @@ function SwipeableDateInput({
       window.removeEventListener("mouseup", handleUp);
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleUp);
+      // If user didn't drag, show the native input on click
+      if (!moved) {
+        setShowNativeInput(true);
+      }
     };
     
     window.addEventListener("mousemove", handleMove, { passive: false });
@@ -352,9 +426,37 @@ function SwipeableDateInput({
     window.addEventListener("touchend", handleUp);
   }
   
+  // Native date input fallback - shown on click, hidden on blur
+  if (showNativeInput) {
+    return (
+      <input
+        ref={nativeInputRef}
+        data-date-segment="true"
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => {
+          if (e.target.value) {
+            onChange(e.target.value);
+          }
+        }}
+        onBlur={() => setShowNativeInput(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Escape") {
+            setShowNativeInput(false);
+          }
+        }}
+        className="rounded-lg border border-[var(--neon-cyan)] bg-[var(--bg-surface)]/80 px-2 py-1 text-xs font-mono text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--glow-cyan)]"
+        style={{ colorScheme: 'dark' }}
+      />
+    );
+  }
+  
   if (!value) {
     return (
       <button
+        data-date-segment="true"
         onClick={() => {
           const today = format(new Date(), "yyyy-MM-dd");
           onChange(min && today < min ? min : max && today > max ? max : today);
@@ -378,7 +480,7 @@ function SwipeableDateInput({
             ? "bg-[var(--neon-cyan)]/20 scale-110 text-[var(--neon-cyan)]"
             : "text-[var(--neon-cyan)] hover:bg-[var(--neon-cyan)]/10 hover:scale-110 active:scale-95"
         )}
-        title="Drag left/right to change month"
+        title="Drag left/right to change month, or click to type"
       >
         {monthNames[month]}
       </div>
@@ -393,7 +495,7 @@ function SwipeableDateInput({
             ? "bg-[var(--neon-purple)]/20 scale-110 text-[var(--neon-purple)]"
             : "text-[var(--neon-purple)] hover:bg-[var(--neon-purple)]/10 hover:scale-110 active:scale-95"
         )}
-        title="Drag left/right to change day"
+        title="Drag left/right to change day, or click to type"
       >
         {String(day).padStart(2, "0")}
       </div>
@@ -408,7 +510,7 @@ function SwipeableDateInput({
             ? "bg-[var(--neon-pink)]/20 scale-110 text-[var(--neon-pink)]"
             : "text-[var(--neon-pink)] hover:bg-[var(--neon-pink)]/10 hover:scale-110 active:scale-95"
         )}
-        title="Drag left/right to change year"
+        title="Drag left/right to change year, or click to type"
       >
         {year}
       </div>
@@ -421,11 +523,13 @@ export function TimelineBar({
   newestChatId,
   highlightChatId,
   onSelectChat,
+  uid,
 }: {
   groupedByDay: Map<string, Chat[]>;
   newestChatId?: string;
   highlightChatId?: string | null;
   onSelectChat?: (chatId: string) => void;
+  uid?: string;
 }) {
   const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -498,6 +602,12 @@ export function TimelineBar({
     if (!scrollElement) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept keys when focused on an input, textarea, or select
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+      
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         scrollElement.scrollBy({ left: -slotWidth * 5, behavior: 'smooth' });
@@ -979,6 +1089,7 @@ export function TimelineBar({
                               }}
                               size={dotPx}
                               yOffset={0}
+                              uid={uid}
                             />
                           </div>
                         );

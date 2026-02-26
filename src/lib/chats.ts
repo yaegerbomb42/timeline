@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
   onSnapshot,
   orderBy,
@@ -192,6 +193,33 @@ export async function deleteChat(uid: string, chatId: string) {
   
   // Delete the original chat
   await deleteDoc(chatRef);
+}
+
+/**
+ * Update the mood rating for a specific chat entry (manual user override).
+ * Preserves existing moodAnalysis fields but updates the rating.
+ */
+export async function updateMoodRating(uid: string, chatId: string, newRating: number): Promise<void> {
+  const clamped = Math.max(1, Math.min(100, Math.round(newRating)));
+  const chatRef = doc(db, "users", uid, "chats", chatId);
+  const chatSnap = await getDoc(chatRef);
+  
+  if (!chatSnap.exists()) return;
+  
+  const data = chatSnap.data();
+  const existing = data.moodAnalysis || {};
+  
+  const mood: Mood = clamped >= 60 ? "positive" : clamped <= 40 ? "negative" : "neutral";
+  
+  await updateDoc(chatRef, {
+    mood,
+    moodAnalysis: {
+      ...existing,
+      rating: clamped,
+      mood,
+      manualOverride: true,
+    },
+  });
 }
 
 export function useChats(uid?: string) {
@@ -659,8 +687,8 @@ export async function recalculateMoodRatingsWithGemini(uid: string, onProgress?:
     
     const data = docSnap.data();
     
-    // Count entries that need Gemini analysis (missing geminiRationale or consciousness)
-    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+    // Count entries that need Gemini analysis (missing geminiRationale)
+    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
       needsUpdate++;
     }
     
@@ -715,5 +743,53 @@ export async function recalculateMoodRatings(uid: string, onProgress?: (current:
   }
   
   return updated;
+}
+
+/**
+ * Reset all mood analysis for all entries so they are re-queued for Gemini processing.
+ * Clears moodAnalysis and mood fields from all text entries (not image-only).
+ * The queue processor will then detect these entries as needing analysis.
+ */
+export async function resetAllMoodAnalysis(uid: string, onProgress?: (current: number, total: number) => void): Promise<number> {
+  const q = query(collection(db, "users", uid, "chats"));
+  const snapshot = await getDocs(q);
+  
+  let reset = 0;
+  const total = snapshot.docs.length;
+  let batch = writeBatch(db);
+  let opsInBatch = 0;
+  
+  for (let i = 0; i < snapshot.docs.length; i++) {
+    const docSnap = snapshot.docs[i];
+    if (!docSnap) continue;
+    
+    const data = docSnap.data();
+    
+    // Only reset entries with text (skip image-only)
+    if (data.text && data.text.trim() && !data.imageOnly) {
+      batch.update(docSnap.ref, {
+        mood: deleteField(),
+        moodAnalysis: deleteField(),
+      });
+      opsInBatch++;
+      reset++;
+      
+      if (opsInBatch >= FIRESTORE_BATCH_SIZE) {
+        await batch.commit();
+        batch = writeBatch(db);
+        opsInBatch = 0;
+      }
+    }
+    
+    if (onProgress) {
+      onProgress(i + 1, total);
+    }
+  }
+  
+  if (opsInBatch > 0) {
+    await batch.commit();
+  }
+  
+  return reset;
 }
 

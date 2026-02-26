@@ -14,11 +14,11 @@ export type QueueLogItem = {
   id: string;
   entryId: string;
   date: string;
+  text: string;
   rating: number;
   mood: string;
   description: string;
   emoji: string;
-  consciousness: string;
   geminiRationale: string;
   timestamp: number;
 };
@@ -63,7 +63,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
           const data = doc.data();
           // Skip image-only entries (they don't need AI analysis)
           // Count entries with text that need mood analysis or with old analysis (no Gemini fields)
-          if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+          if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
             pendingCount++;
           }
         });
@@ -136,7 +136,6 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
               score: result.score,
               rationale: result.rationale,
               geminiRationale: result.geminiRationale || result.rationale,
-              consciousness: result.consciousness || "neutral observation",
             },
           });
           updated++;
@@ -148,15 +147,15 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
               id: `${result.id}-${Date.now()}`,
               entryId: result.id,
               date: matchingEntry?.date || "",
+              text: matchingEntry?.text || "",
               rating: result.rating,
               mood: result.mood,
               description: result.description,
               emoji: result.emoji,
-              consciousness: result.consciousness || "neutral observation",
               geminiRationale: result.geminiRationale || result.rationale || "",
               timestamp: Date.now(),
             };
-            return [newItem, ...prev].slice(0, 10); // Keep most recent 10
+            return [newItem, ...prev].slice(0, 30); // Keep most recent 30
           });
         } catch (updateError) {
           console.error(`Failed to update entry ${result.id}:`, updateError);
@@ -192,7 +191,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         const data = doc.data();
         // Skip image-only entries (they don't need AI analysis)
         // Check for entries with text without mood analysis OR without Gemini-enhanced analysis
-        if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+        if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
           pending.push({
             id: doc.id,
             text: String(data.text),
