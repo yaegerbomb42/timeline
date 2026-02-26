@@ -20,7 +20,6 @@ type MoodResult = {
   rationale: string;
   score: number;
   geminiRationale: string;
-  consciousness: string;
 };
 
 type Body = {
@@ -58,70 +57,19 @@ export async function POST(req: Request) {
     .map((e, idx) => `Entry ${idx + 1} (${e.date}):\n${e.text}`)
     .join("\n\n---\n\n");
 
-  const prompt = `You are an expert emotional intelligence analyst and psychologist with deep understanding of human consciousness, emotion, and behavior. You provide extremely precise mood ratings and thoughtful, rich summaries for personal journal entries.
+  const prompt = `Analyze each of the following journal entries. For each entry, consider its mood, content, and theme to produce a general rating out of 100 (where 1 is extremely negative and 100 is extremely positive).
 
-For each entry, analyze thoroughly:
-
-1. **Emotional Landscape**: Primary and secondary emotions, emotional intensity, emotional contradictions
-2. **Language Analysis**: Word choice, sentence structure, punctuation patterns, use of capitalization, exclamation marks
-3. **Context & Subtext**: What is said explicitly vs. what is implied; sarcasm detection; emotional masking
-4. **Self-Awareness**: How conscious is the writer of their own emotional state?
-5. **Cognitive Patterns**: Rumination, catastrophizing, growth thinking, acceptance, avoidance
-6. **Life Context**: Events, relationships, goals, challenges, victories mentioned or implied
-
-Consciousness Indicators (select the most fitting):
-  * "observant text" - detailed external observations, noticing surroundings
-  * "self discovery" - introspective insights, personal revelations
-  * "overthinking reality" - philosophical rumination, analysis paralysis
-  * "social connection" - relationship/connection focused
-  * "pessimistic" - negative outlook, cynicism, hopelessness
-  * "hopeful" - optimistic, forward-thinking, excited about future
-  * "emotional processing" - actively working through feelings
-  * "creative expression" - artistic, imaginative, abstract thinking
-  * "grounded presence" - mindful, present-moment awareness, calm
-  * "growth mindset" - learning from experience, building resilience
+For each entry, first write a paragraph of your thoughts about what you found noteworthy in the text and how it informed the rating you will give. Then write a single sentence summarizing why you gave that score. Then give the score.
 
 Respond with a JSON array of exactly ${body.entries.length} objects, one for each entry in order:
 {
-  "rating": <integer 1-100, be precise and nuanced>,
+  "rating": <integer 1-100>,
   "mood": "<positive|negative|neutral>",
-  "description": "<a punchy, complete sentence capturing the emotional essence - NOT just adjectives>",
+  "description": "<a single sentence explaining why you gave this score, e.g. 'User debated whether umbrellas were real meaning they are quite confused thus very low score'>",
   "emoji": "<single most appropriate emoji>",
-  "rationale": "<3-4 sentence summary: state the dominant emotion, explain key emotional drivers from the text, note any emotional complexity or contradictions, and give your overall impression>",
-  "geminiRationale": "<5-8 sentence deep analysis (~500 tokens): analyze the emotional arc of the entry, discuss what the writer may not be saying explicitly, identify patterns of thought or behavior, assess their self-awareness level, note the consciousness type and why, and provide a compassionate psychological perspective>",
-  "consciousness": "<one of the consciousness indicators above>",
-  "score": <number -15 to +15, maps to raw sentiment intensity>
+  "geminiRationale": "<a paragraph of your thoughts about what you found noteworthy in this text and how it informed the rating>",
+  "score": <number -15 to +15, raw sentiment intensity>
 }
-
-RATING GUIDELINES (be precise - use the full range with intention):
-- 95-100: Life-changing joy, peak experiences, profound gratitude/love
-- 85-94: Very happy, significant achievement, deep contentment  
-- 75-84: Clearly happy, good day, meaningful positive experiences
-- 65-74: Mildly positive, productive, things going well
-- 55-64: Slightly positive, routine but okay, mild optimism
-- 45-54: Truly neutral, factual recording, mixed feelings that cancel out
-- 35-44: Mildly negative, minor frustrations, slight worry or boredom
-- 25-34: Clearly unhappy, notable stress, disappointment, or sadness
-- 15-24: Quite distressed, significant anxiety, anger, or grief
-- 5-14: Severe distress, crisis, devastating events
-- 1-4: Absolute rock bottom, emergency-level emotional pain
-
-CALIBRATION EXAMPLES:
-- Confused/Ambiguous (~49/100): "User appears confused about where to go next in life, expressing uncertainty about career direction."
-- Deeply Sad (~8/100): "Claims they feel bluer than the sky, expressing profound emotional pain and hopelessness."
-- High Positive (~84/100): "Played with dogs and had a good time fishing with friends at the lake."
-
-CRITICAL RULES:
-- Be PRECISE. A "pretty good day" is 65-72, not 85. "Feeling okay" is 50-55, not 70.
-- Most routine journal entries naturally fall between 40-65.
-- Only give 80+ for genuinely strong positive content with clear emotional evidence.
-- Only give below 25 for genuinely severe negative content.
-- NEVER be fooled by the literary FORM of writing. Poetry, songs, and creative writing can express DEVASTATING sadness. A poem about a pet dying, a loved one being lost, or grief is EXTREMELY NEGATIVE (5-20 range) regardless of beautiful language. Analyze the CONTENT and MEANING, not the writing style.
-- Death, loss, dying, grief, bereavement, terminal illness — these are ALWAYS strong negative indicators (rating 5-25) regardless of how artfully expressed.
-- Sarcasm, irony, and dark humor that masks pain should be rated based on the UNDERLYING emotion, not the surface tone.
-- The "description" field should be a COMPLETE SENTENCE, not just adjectives. Example: "Played with dogs and had a good time fishing." NOT "happy and content".
-- The "rationale" should reference SPECIFIC words, phrases, or themes from the entry.
-- The "geminiRationale" should provide genuine psychological insight (~500 tokens), not just restate the entry. This is the detailed analysis that shows your expertise.
 
 ENTRIES:
 
@@ -203,11 +151,10 @@ Respond ONLY with the JSON array, no other text.`;
       id: body.entries[idx]!.id,
       rating: Math.max(1, Math.min(100, Math.round(result.rating || 50))),
       mood: result.mood || "neutral",
-      description: result.description || "neutral",
+      description: result.description || "No description available",
       emoji: result.emoji || "😐",
-      rationale: result.rationale || "No analysis available",
-      geminiRationale: result.geminiRationale || result.rationale || "No detailed analysis available",
-      consciousness: result.consciousness || "neutral observation",
+      rationale: result.description || "No analysis available",
+      geminiRationale: result.geminiRationale || "No detailed analysis available",
       score: Math.max(-15, Math.min(15, result.score || 0)),
     }));
 

@@ -687,8 +687,8 @@ export async function recalculateMoodRatingsWithGemini(uid: string, onProgress?:
     
     const data = docSnap.data();
     
-    // Count entries that need Gemini analysis (missing geminiRationale or consciousness)
-    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale || !data.moodAnalysis.consciousness)) {
+    // Count entries that need Gemini analysis (missing geminiRationale)
+    if (data.text && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
       needsUpdate++;
     }
     
