@@ -125,7 +125,7 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
             <Brain className="h-4 w-4 text-[var(--neon-purple)]" />
           </motion.div>
           <span className="text-sm font-sans font-semibold text-[var(--text-primary)]">
-            Queue Processor
+            AI Queue Processor
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">

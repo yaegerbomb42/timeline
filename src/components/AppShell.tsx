@@ -17,7 +17,7 @@ import { DeletedArchiveModal } from "@/components/DeletedArchiveModal";
 import { BulkDeleteModal } from "@/components/BulkDeleteModal";
 import { GeminiQueuePanel } from "@/components/GeminiQueuePanel";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { addChat, deleteChat, useChats, recalculateMoodRatings } from "@/lib/chats";
+import { addChat, deleteChat, useChats, resetAllMoodAnalysis } from "@/lib/chats";
 import { useEngagementStats } from "@/lib/useEngagementStats";
 import { useMoodAnalysisQueue } from "@/lib/hooks/useMoodAnalysisQueue";
 import { useAiKey } from "@/lib/ai/useAiKey";
@@ -757,18 +757,18 @@ export function AppShell() {
             if (recalculatingMoods) return;
             
             const confirmed = window.confirm(
-              "This will recalculate mood ratings for all entries that don't have them or are missing the detailed rationale. Continue?"
+              "This will reset ALL mood analysis and re-queue every entry for Gemini AI re-evaluation. This may use significant API quota. Continue?"
             );
             if (!confirmed) return;
             
             setRecalculatingMoods(true);
             try {
-              const updated = await recalculateMoodRatings(user.uid, (current, total) => {
-                console.log(`Recalculating moods: ${current}/${total}`);
+              const resetCount = await resetAllMoodAnalysis(user.uid, (current, total) => {
+                console.log(`Resetting mood analysis: ${current}/${total}`);
               });
-              alert(`Successfully recalculated ${updated} mood ratings!`);
+              alert(`Reset ${resetCount} entries for Gemini re-evaluation! The AI queue will automatically start processing them.`);
             } catch (err: any) {
-              alert(`Failed to recalculate moods: ${err.message}`);
+              alert(`Failed to reset mood analysis: ${err.message}`);
             } finally {
               setRecalculatingMoods(false);
             }
@@ -904,6 +904,7 @@ export function AppShell() {
                     const el = document.getElementById(`chat-${id}`);
                     el?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
+                  uid={user?.uid}
                 />
               </div>
             </motion.section>

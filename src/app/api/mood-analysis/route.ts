@@ -116,6 +116,9 @@ CRITICAL RULES:
 - Most routine journal entries naturally fall between 40-65.
 - Only give 80+ for genuinely strong positive content with clear emotional evidence.
 - Only give below 25 for genuinely severe negative content.
+- NEVER be fooled by the literary FORM of writing. Poetry, songs, and creative writing can express DEVASTATING sadness. A poem about a pet dying, a loved one being lost, or grief is EXTREMELY NEGATIVE (5-20 range) regardless of beautiful language. Analyze the CONTENT and MEANING, not the writing style.
+- Death, loss, dying, grief, bereavement, terminal illness — these are ALWAYS strong negative indicators (rating 5-25) regardless of how artfully expressed.
+- Sarcasm, irony, and dark humor that masks pain should be rated based on the UNDERLYING emotion, not the surface tone.
 - The "description" field should be a COMPLETE SENTENCE, not just adjectives. Example: "Played with dogs and had a good time fishing." NOT "happy and content".
 - The "rationale" should reference SPECIFIC words, phrases, or themes from the entry.
 - The "geminiRationale" should provide genuine psychological insight (~500 tokens), not just restate the entry. This is the detailed analysis that shows your expertise.
