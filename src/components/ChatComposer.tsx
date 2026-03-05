@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard, Upload } from "lucide-react";
+import { ArrowUpRight, Feather, Sparkles, Mic, Zap, ImagePlus, X, Clipboard, Upload, KeyRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -75,11 +75,15 @@ export function ChatComposer({
   onSend,
   onSendStart,
   onBatchImport,
+  hasApiKey,
+  onSetApiKey,
 }: {
   disabled?: boolean;
   onSend: (text: string, imageFile?: File) => Promise<void> | void;
   onSendStart?: (start: DOMRect) => void;
   onBatchImport?: (file?: File) => void;
+  hasApiKey?: boolean;
+  onSetApiKey?: (key: string) => void;
 }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -91,6 +95,7 @@ export function ChatComposer({
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -298,6 +303,66 @@ export function ChatComposer({
         )}
       </AnimatePresence>
 
+      {/* API Key required prompt */}
+      {hasApiKey === false && onSetApiKey ? (
+        <div className="relative px-6 py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4 text-center"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <KeyRound className="h-8 w-8 text-[var(--neon-purple)]" />
+            </motion.div>
+            <div>
+              <div className="font-sans text-sm font-semibold text-[var(--text-primary)] mb-1">
+                API Key Required
+              </div>
+              <div className="text-xs text-[var(--text-secondary)] max-w-sm">
+                Enter your Gemini API key to enable timeline entries and AI-powered mood analysis. Your key is encrypted and stored securely.
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full max-w-md">
+              <input
+                type="password"
+                value={apiKeyDraft}
+                onChange={(e) => setApiKeyDraft(e.target.value)}
+                placeholder="Paste your Gemini API key…"
+                className={cn(
+                  "flex-1 rounded-xl border border-[var(--line)] bg-[var(--bg-surface)]/60 backdrop-blur-xl",
+                  "px-4 py-2.5 font-mono text-sm text-[var(--text-primary)]",
+                  "outline-none focus:ring-2 focus:ring-[var(--glow-cyan)] transition-all",
+                  "placeholder:text-[var(--text-muted)]/50",
+                )}
+              />
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (apiKeyDraft.trim()) {
+                    onSetApiKey(apiKeyDraft.trim());
+                    setApiKeyDraft("");
+                  }
+                }}
+                disabled={!apiKeyDraft.trim()}
+                className={cn(
+                  "rounded-xl px-5 py-2.5 font-sans text-sm font-semibold",
+                  "bg-gradient-to-r from-[var(--neon-cyan)] to-[var(--neon-purple)]",
+                  "text-[var(--bg-deep)]",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "shadow-[0_4px_16px_rgba(67,97,238,0.4)]",
+                )}
+              >
+                Save Key
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      ) : (
+
       <div className="relative px-6 py-6">
         <div className="relative flex items-start gap-2" style={{ perspective: "1000px" }}>
           <motion.textarea
@@ -504,6 +569,7 @@ export function ChatComposer({
           </div>
         </div>
       </div>
+      )}
     </motion.div>
   );
 }
