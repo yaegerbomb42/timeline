@@ -23,6 +23,12 @@ export type QueueLogItem = {
   timestamp: number;
 };
 
+export type PendingDisplayEntry = {
+  id: string;
+  text: string;
+  date: string;
+};
+
 type QueueStatus = {
   pending: number;
   processing: boolean;
@@ -48,6 +54,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     errors: 0,
   });
   const [recentResults, setRecentResults] = useState<QueueLogItem[]>([]);
+  const [pendingEntries, setPendingEntries] = useState<PendingDisplayEntry[]>([]);
   
   const processingRef = useRef(false);
   const abortRef = useRef(false);
@@ -61,14 +68,22 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       collection(db, "users", uid, "chats"),
       (snapshot) => {
         let pendingCount = 0;
+        const pendingList: PendingDisplayEntry[] = [];
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
           // Skip image-only entries (they don't need AI analysis)
           // Count entries with text that need mood analysis or with old analysis (no Gemini fields)
           if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
             pendingCount++;
+            pendingList.push({
+              id: doc.id,
+              text: String(data.text),
+              date: data.dayKey || "",
+            });
           }
         });
+        
+        setPendingEntries(pendingList);
         
         // Use callback form to avoid cascading renders
         setStatus((prev) => {
@@ -312,6 +327,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   return {
     status,
     recentResults,
+    pendingEntries,
     startQueue,
     stopQueue,
     isProcessing: status.processing,
