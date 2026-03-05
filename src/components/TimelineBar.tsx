@@ -308,6 +308,14 @@ function SwipeableDateInput({
   // Unified drag handler: dragging anywhere on the date control moves the
   // entire date by days.  Sensitivity is tuned so that a moderate drag
   // (~3 inches / ~288 px) can traverse several years worth of days.
+  //
+  // Drag acceleration constants:
+  const FINE_ZONE_PX = 50;            // Pixels of fine-control drag before acceleration
+  const BASE_PX_PER_DAY = 4;          // Pixels per day in the fine zone
+  const FINE_ZONE_DAYS = FINE_ZONE_PX / BASE_PX_PER_DAY; // ~12.5 days in fine zone
+  const ACCEL_EXPONENT = 1.5;         // Exponent for quadratic-ish acceleration
+  const ACCEL_DIVISOR = 8;            // Divisor dampening acceleration speed
+
   function handleUnifiedDrag(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -334,19 +342,14 @@ function SwipeableDateInput({
 
       // Accelerating sensitivity: small drags move slowly (fine control),
       // larger drags accelerate so you can cover years quickly.
-      // Base: 1 day per 4px for the first 50px of drag,
-      // then acceleration ramps up quadratically.
       const absDx = Math.abs(dx);
       let dayDelta: number;
-      if (absDx <= 50) {
-        dayDelta = Math.round(dx / 4);
+      if (absDx <= FINE_ZONE_PX) {
+        dayDelta = Math.round(dx / BASE_PX_PER_DAY);
       } else {
-        // First 50px = 12.5 days, then accelerate
-        const extra = absDx - 50;
-        const baseDays = 12.5;
-        // Quadratic acceleration: extra^1.5 / 8 gives rapid traversal
-        const accelDays = Math.pow(extra, 1.5) / 8;
-        dayDelta = Math.round(Math.sign(dx) * (baseDays + accelDays));
+        const extra = absDx - FINE_ZONE_PX;
+        const accelDays = Math.pow(extra, ACCEL_EXPONENT) / ACCEL_DIVISOR;
+        dayDelta = Math.round(Math.sign(dx) * (FINE_ZONE_DAYS + accelDays));
       }
 
       if (dayDelta !== lastDayDelta) {
@@ -431,8 +434,8 @@ function SwipeableDateInput({
     >
       <div
         className={cn(
-          "px-2 py-1.5 text-xs font-mono transition-all",
-          isDragging ? "text-[var(--neon-cyan)]" : "text-[var(--neon-cyan)]"
+          "px-2 py-1.5 text-xs font-mono transition-all text-[var(--neon-cyan)]",
+          isDragging && "brightness-125"
         )}
       >
         {monthNames[month]}
@@ -440,8 +443,8 @@ function SwipeableDateInput({
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
         className={cn(
-          "px-2 py-1.5 text-xs font-mono transition-all",
-          isDragging ? "text-[var(--neon-purple)]" : "text-[var(--neon-purple)]"
+          "px-2 py-1.5 text-xs font-mono transition-all text-[var(--neon-purple)]",
+          isDragging && "brightness-125"
         )}
       >
         {String(day).padStart(2, "0")}
@@ -449,8 +452,8 @@ function SwipeableDateInput({
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
         className={cn(
-          "px-2 py-1.5 text-xs font-mono transition-all",
-          isDragging ? "text-[var(--neon-pink)]" : "text-[var(--neon-pink)]"
+          "px-2 py-1.5 text-xs font-mono transition-all text-[var(--neon-pink)]",
+          isDragging && "brightness-125"
         )}
       >
         {year}
