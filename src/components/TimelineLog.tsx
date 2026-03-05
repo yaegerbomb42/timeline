@@ -212,7 +212,7 @@ function TimelineEntry({
                 >
                   <span className="text-base">{chat.moodAnalysis.emoji}</span>
                   <span className="text-xs font-mono font-semibold" style={{ color: ratingToColor(displayRating) }}>
-                    {displayRating}/100
+                    {Math.round(displayRating)}/100
                   </span>
                   <span className="text-xs text-[var(--text-secondary)] italic capitalize hidden sm:inline">
                     {chat.moodAnalysis.description}
@@ -241,7 +241,7 @@ function TimelineEntry({
                       background: `linear-gradient(to right, rgb(255,0,0), rgb(255,200,0) 40%, rgb(0,255,0) 100%)`,
                       accentColor: ratingToColor(displayRating),
                     }}
-                    title={`Adjust mood rating: ${displayRating}/100`}
+                    title={`Adjust mood rating: ${Math.round(displayRating)}/100`}
                   />
                   {/* Refresh button to re-queue for AI analysis */}
                   <motion.button
