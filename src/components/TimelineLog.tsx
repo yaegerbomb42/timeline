@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock3, Trash2, Sparkles, RotateCw } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";
@@ -44,6 +44,7 @@ function TimelineEntry({
   const [isDeleting, setIsDeleting] = useState(false);
   const [sliderValue, setSliderValue] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const isDraggingBadge = useRef(false);
 
   const currentRating = chat.moodAnalysis?.rating ?? 50;
   const displayRating = sliderValue !== null ? sliderValue : currentRating;
@@ -56,15 +57,42 @@ function TimelineEntry({
     }, 300);
   };
 
-  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSliderValue(Number(e.target.value));
-  }, []);
+  const handleBadgeDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!uid) return;
+    e.preventDefault();
+    isDraggingBadge.current = true;
+    const startX = "touches" in e ? e.touches[0]!.clientX : e.clientX;
+    const startRating = sliderValue ?? currentRating;
 
-  const handleSliderCommit = useCallback(() => {
-    if (uid && sliderValue !== null && sliderValue !== currentRating) {
-      void updateMoodRating(uid, chat.id, sliderValue);
-    }
-    setSliderValue(null);
+    const handleMove = (ev: MouseEvent | TouchEvent) => {
+      if (!isDraggingBadge.current) return;
+      const currentX = "touches" in ev ? ev.touches[0]!.clientX : (ev as MouseEvent).clientX;
+      const dx = currentX - startX;
+      // 2px of drag = 1 rating point
+      const delta = Math.round(dx / 2);
+      setSliderValue(Math.max(1, Math.min(100, startRating + delta)));
+    };
+
+    const handleUp = () => {
+      if (!isDraggingBadge.current) return;
+      isDraggingBadge.current = false;
+      // Commit the drag value
+      setSliderValue((val) => {
+        if (val !== null && val !== currentRating) {
+          void updateMoodRating(uid!, chat.id, val);
+        }
+        return null;
+      });
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleUp);
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleUp);
   }, [uid, chat.id, sliderValue, currentRating]);
 
   const handleRefresh = useCallback(async () => {
@@ -199,7 +227,7 @@ function TimelineEntry({
               "ring-2 ring-[var(--neon-cyan)]/50 shadow-[0_12px_32px_rgba(0,245,255,0.3)]"
           )}
         >
-          {/* Header with mood, slider, refresh, and delete button */}
+          {/* Header with mood badge (draggable to rescore), refresh, and delete button */}
           <div className="flex items-center justify-between gap-4 mb-3">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {chat.moodAnalysis && (
@@ -207,8 +235,15 @@ function TimelineEntry({
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 + 0.25 }}
-                  className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border border-[var(--line)] bg-[var(--bg-surface)]/50"
-                  title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border border-[var(--line)] bg-[var(--bg-surface)]/50",
+                    uid && !chat.imageOnly && "cursor-ew-resize select-none"
+                  )}
+                  title={uid && !chat.imageOnly
+                    ? `Drag left/right to adjust rating (${Math.round(displayRating)}/100)\n${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`
+                    : `Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
+                  onMouseDown={uid && !chat.imageOnly ? handleBadgeDragStart : undefined}
+                  onTouchStart={uid && !chat.imageOnly ? handleBadgeDragStart : undefined}
                 >
                   <span className="text-base">{chat.moodAnalysis.emoji}</span>
                   <span className="text-xs font-mono font-semibold" style={{ color: ratingToColor(displayRating) }}>
@@ -220,30 +255,14 @@ function TimelineEntry({
                 </motion.div>
               )}
 
-              {/* Rating slider - only show for entries with text (not image-only) */}
+              {/* Refresh button to re-queue for AI analysis */}
               {!chat.imageOnly && uid && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 + 0.3 }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 >
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    value={displayRating}
-                    onChange={handleSliderChange}
-                    onMouseUp={handleSliderCommit}
-                    onTouchEnd={handleSliderCommit}
-                    className="w-20 sm:w-28 h-1.5 rounded-full appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, rgb(255,0,0), rgb(255,200,0) 40%, rgb(0,255,0) 100%)`,
-                      accentColor: ratingToColor(displayRating),
-                    }}
-                    title={`Adjust mood rating: ${Math.round(displayRating)}/100`}
-                  />
-                  {/* Refresh button to re-queue for AI analysis */}
                   <motion.button
                     type="button"
                     whileHover={{ scale: 1.15, rotate: 90 }}
