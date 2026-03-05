@@ -223,6 +223,18 @@ export async function updateMoodRating(uid: string, chatId: string, newRating: n
   });
 }
 
+/**
+ * Reset mood analysis for a single entry so it is re-queued for Gemini processing.
+ * Clears moodAnalysis and mood fields, causing the queue processor to re-process it.
+ */
+export async function resetSingleMoodAnalysis(uid: string, chatId: string): Promise<void> {
+  const chatRef = doc(db, "users", uid, "chats", chatId);
+  await updateDoc(chatRef, {
+    mood: deleteField(),
+    moodAnalysis: deleteField(),
+  });
+}
+
 export function useChats(uid?: string) {
   const [loading, setLoading] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);

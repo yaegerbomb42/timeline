@@ -2,29 +2,51 @@
 
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock3, Trash2, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Clock3, Trash2, Sparkles, RotateCw } from "lucide-react";
+import { useState, useCallback } from "react";
 
 import { DeleteConfirmModal } from "@/components/DeleteConfirmModal";
 import type { Chat } from "@/lib/chats";
+import { updateMoodRating, resetSingleMoodAnalysis } from "@/lib/chats";
 import { cn } from "@/lib/utils";
+
+// Convert a rating (1-100) to the same color used by the rollercoaster gradient
+function ratingToColor(rating: number): string {
+  if (rating < 40) {
+    const intensity = (40 - rating) / 40;
+    return `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
+  } else if (rating > 60) {
+    const intensity = (rating - 60) / 40;
+    return `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
+  } else {
+    const neutralPos = (rating - 40) / 20;
+    return `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
+  }
+}
 
 // Timeline Entry Component
 function TimelineEntry({
   chat,
   isHighlighted,
   onDelete,
+  uid,
   index,
   isFirst,
 }: {
   chat: Chat;
   isHighlighted?: boolean;
   onDelete?: (id: string) => void;
+  uid?: string;
   index: number;
   isFirst: boolean;
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sliderValue, setSliderValue] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const currentRating = chat.moodAnalysis?.rating ?? 50;
+  const displayRating = sliderValue !== null ? sliderValue : currentRating;
 
   const handleConfirmDelete = () => {
     if (!onDelete) return;
@@ -33,6 +55,30 @@ function TimelineEntry({
       onDelete(chat.id);
     }, 300);
   };
+
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSliderValue(Number(e.target.value));
+  }, []);
+
+  const handleSliderCommit = useCallback(() => {
+    if (uid && sliderValue !== null && sliderValue !== currentRating) {
+      void updateMoodRating(uid, chat.id, sliderValue);
+    }
+    setSliderValue(null);
+  }, [uid, chat.id, sliderValue, currentRating]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!uid || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await resetSingleMoodAnalysis(uid, chat.id);
+    } catch (err) {
+      console.error("Failed to re-queue entry:", err);
+    } finally {
+      // Keep spinner briefly so user sees feedback
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }
+  }, [uid, chat.id, isRefreshing]);
 
   const dateStr = format(chat.createdAt, "MMM d, yyyy");
   const timeStr = format(chat.createdAt, "h:mm a");
@@ -153,25 +199,69 @@ function TimelineEntry({
               "ring-2 ring-[var(--neon-cyan)]/50 shadow-[0_12px_32px_rgba(0,245,255,0.3)]"
           )}
         >
-          {/* Header with mood and delete button */}
+          {/* Header with mood, slider, refresh, and delete button */}
           <div className="flex items-center justify-between gap-4 mb-3">
-            {chat.moodAnalysis && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 + 0.25 }}
-                className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border border-[var(--line)] bg-[var(--bg-surface)]/50"
-                title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
-              >
-                <span className="text-base">{chat.moodAnalysis.emoji}</span>
-                <span className="text-xs font-mono text-[var(--text-secondary)] font-semibold">
-                  {chat.moodAnalysis.rating}/100
-                </span>
-                <span className="text-xs text-[var(--text-secondary)] italic capitalize">
-                  {chat.moodAnalysis.description}
-                </span>
-              </motion.div>
-            )}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {chat.moodAnalysis && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 + 0.25 }}
+                  className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 border border-[var(--line)] bg-[var(--bg-surface)]/50"
+                  title={`Mood: ${chat.moodAnalysis.mood} - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}`}
+                >
+                  <span className="text-base">{chat.moodAnalysis.emoji}</span>
+                  <span className="text-xs font-mono font-semibold" style={{ color: ratingToColor(displayRating) }}>
+                    {displayRating}/100
+                  </span>
+                  <span className="text-xs text-[var(--text-secondary)] italic capitalize hidden sm:inline">
+                    {chat.moodAnalysis.description}
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Rating slider - only show for entries with text (not image-only) */}
+              {!chat.imageOnly && uid && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 + 0.3 }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2"
+                >
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    value={displayRating}
+                    onChange={handleSliderChange}
+                    onMouseUp={handleSliderCommit}
+                    onTouchEnd={handleSliderCommit}
+                    className="w-20 sm:w-28 h-1.5 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, rgb(255,0,0), rgb(255,200,0) 40%, rgb(0,255,0) 100%)`,
+                      accentColor: ratingToColor(displayRating),
+                    }}
+                    title={`Adjust mood rating: ${displayRating}/100`}
+                  />
+                  {/* Refresh button to re-queue for AI analysis */}
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.15, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className={cn(
+                      "rounded-lg p-1.5 text-[var(--text-secondary)] hover:text-[var(--neon-cyan)] hover:bg-[var(--bg-surface)]/50 transition-colors",
+                      isRefreshing && "animate-spin text-[var(--neon-cyan)]"
+                    )}
+                    title="Re-analyze with AI"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </motion.button>
+                </motion.div>
+              )}
+            </div>
+
             {onDelete && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -255,12 +345,14 @@ export function TimelineLog({
   error,
   onDelete,
   highlightChatId,
+  uid,
 }: {
   chats: Chat[];
   loading: boolean;
   error: string | null;
   onDelete?: (id: string) => void;
   highlightChatId?: string | null;
+  uid?: string;
 }) {
   return (
     <motion.div
@@ -342,6 +434,7 @@ export function TimelineLog({
               chat={c}
               isHighlighted={c.id === highlightChatId}
               onDelete={onDelete}
+              uid={uid}
               index={idx}
               isFirst={idx === 0}
             />

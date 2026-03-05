@@ -127,16 +127,40 @@ Respond ONLY with the JSON array, no other text.`;
     // Parse JSON response
     let analysisResults: any[];
     try {
-      // Extract JSON from response (might have markdown code blocks)
-      const jsonMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/) || text.match(/(\[[\s\S]*\])/);
-      const jsonText = jsonMatch ? jsonMatch[1] : text;
+      // Extract JSON from response (might have markdown code blocks or extra text)
+      let jsonText = text;
+      const codeBlockMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+      if (codeBlockMatch) {
+        jsonText = codeBlockMatch[1];
+      } else {
+        const arrayMatch = text.match(/(\[[\s\S]*\])/);
+        if (arrayMatch) {
+          jsonText = arrayMatch[1];
+        }
+      }
+      // Strip any trailing commas before closing brackets (common AI formatting issue)
+      jsonText = jsonText.replace(/,\s*([}\]])/g, '$1');
       analysisResults = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", text);
-      return NextResponse.json(
-        { error: "Failed to parse AI response as JSON.", details: text.slice(0, 500) },
-        { status: 502 }
-      );
+    } catch {
+      console.error("Failed to parse AI response:", text.slice(0, 200));
+
+      // Attempt to salvage partial results by extracting individual JSON objects
+      try {
+        const objectMatches = [...text.matchAll(/\{[^{}]*"rating"\s*:\s*\d+[^{}]*\}/g)];
+        if (objectMatches.length === body.entries.length) {
+          analysisResults = objectMatches.map(m => JSON.parse(m[0].replace(/,\s*([}\]])/g, '$1')));
+        } else {
+          return NextResponse.json(
+            { error: "Failed to parse AI response as JSON.", details: text.slice(0, 500) },
+            { status: 502 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Failed to parse AI response as JSON.", details: text.slice(0, 500) },
+          { status: 502 }
+        );
+      }
     }
 
     // Validate and map results to entries
