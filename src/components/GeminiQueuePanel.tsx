@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, Zap, Clock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useEffect, useState, useMemo, useSyncExternalStore, useCallback } from "react";
-import type { QueueLogItem } from "@/lib/hooks/useMoodAnalysisQueue";
+import type { QueueLogItem, PendingDisplayEntry } from "@/lib/hooks/useMoodAnalysisQueue";
 
 interface GeminiQueuePanelProps {
   status: {
@@ -14,6 +14,7 @@ interface GeminiQueuePanelProps {
     errors: number;
   };
   recentResults: QueueLogItem[];
+  pendingEntries: PendingDisplayEntry[];
 }
 
 function getMoodColorForPanel(mood: string): string {
@@ -25,15 +26,20 @@ function getMoodColorForPanel(mood: string): string {
 }
 
 const DISPLAY_DURATION_MS = 10_000;
-const MAX_DISPLAY_ITEMS = 5; // Cap visible items to avoid overwhelming with hundreds in queue
+const MAX_DISPLAY_ITEMS = 5;
 
-// External store for tracking seen IDs and display items
-// This avoids calling setState in effects which violates react-hooks/set-state-in-effect
-const queueStore = {
+// ── Slot types ──────────────────────────────────────────────────────────
+type PendingSlot = { kind: "pending"; entry: PendingDisplayEntry };
+type ActiveSlot = { kind: "active"; entry: PendingDisplayEntry };
+type CompletedSlot = { kind: "completed"; result: QueueLogItem; expiresAt: number };
+type DisplaySlot = PendingSlot | ActiveSlot | CompletedSlot;
+
+// ── External store for completed items (avoids setState-in-effect) ─────
+const completedStore = {
   seenIds: new Set<string>(),
   items: [] as (QueueLogItem & { expiresAt: number })[],
   listeners: new Set<() => void>(),
-  
+
   addItems(newResults: QueueLogItem[]) {
     const now = Date.now();
     let changed = false;
@@ -46,7 +52,7 @@ const queueStore = {
     }
     if (changed) this.notify();
   },
-  
+
   cleanup() {
     const now = Date.now();
     const filtered = this.items.filter(item => item.expiresAt > now);
@@ -55,57 +61,94 @@ const queueStore = {
       this.notify();
     }
   },
-  
+
   notify() {
     this.listeners.forEach(fn => fn());
   },
-  
+
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => { this.listeners.delete(fn); };
   },
-  
+
   getSnapshot() {
     return this.items;
-  }
+  },
 };
 
-function useDisplayQueue(recentResults: QueueLogItem[]) {
+function useDisplaySlots(
+  recentResults: QueueLogItem[],
+  pendingEntries: PendingDisplayEntry[],
+  isProcessing: boolean,
+) {
   const [nowMs, setNowMs] = useState(() => Date.now());
-  
+
   // Periodic tick for countdown + expiry
   useEffect(() => {
     const timer = setInterval(() => {
       setNowMs(Date.now());
-      queueStore.cleanup();
+      completedStore.cleanup();
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-  
+
   // Sync new results into the external store
   useEffect(() => {
     if (recentResults.length > 0) {
-      queueStore.addItems(recentResults);
+      completedStore.addItems(recentResults);
     }
   }, [recentResults]);
-  
+
   // Subscribe to store changes
-  const items = useSyncExternalStore(
-    useCallback((cb: () => void) => queueStore.subscribe(cb), []),
-    useCallback(() => queueStore.getSnapshot(), []),
-    useCallback(() => queueStore.getSnapshot(), []),
+  const completedItems = useSyncExternalStore(
+    useCallback((cb: () => void) => completedStore.subscribe(cb), []),
+    useCallback(() => completedStore.getSnapshot(), []),
+    useCallback(() => completedStore.getSnapshot(), []),
   );
-  
-  // Filter expired items for display and cap at MAX_DISPLAY_ITEMS
-  const displayItems = useMemo(() => {
-    return items.filter(item => item.expiresAt > nowMs).slice(0, MAX_DISPLAY_ITEMS);
-  }, [items, nowMs]);
-  
-  return { displayItems, nowMs };
+
+  // Build a unified slot list: completed items first, then active, then pending
+  const slots: DisplaySlot[] = useMemo(() => {
+    const result: DisplaySlot[] = [];
+
+    // IDs of entries that have completed results still on screen
+    const completedEntryIds = new Set(
+      completedItems.filter(c => c.expiresAt > nowMs).map(c => c.entryId),
+    );
+
+    // Completed items (still visible, showing results)
+    for (const c of completedItems) {
+      if (c.expiresAt > nowMs && result.length < MAX_DISPLAY_ITEMS) {
+        result.push({ kind: "completed", result: c, expiresAt: c.expiresAt });
+      }
+    }
+
+    // Fill remaining slots with pending entries (skip any that are already completed on screen)
+    const remainingSlots = MAX_DISPLAY_ITEMS - result.length;
+    if (remainingSlots > 0) {
+      const filteredPending = pendingEntries.filter(e => !completedEntryIds.has(e.id));
+      for (let i = 0; i < Math.min(remainingSlots, filteredPending.length); i++) {
+        const entry = filteredPending[i]!;
+        // First pending entry is "active" when processing
+        if (i === 0 && isProcessing) {
+          result.push({ kind: "active", entry });
+        } else {
+          result.push({ kind: "pending", entry });
+        }
+      }
+    }
+
+    return result;
+  }, [completedItems, pendingEntries, isProcessing, nowMs]);
+
+  return { slots, nowMs };
 }
 
-export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProps) {
-  const { displayItems, nowMs } = useDisplayQueue(recentResults);
+export function GeminiQueuePanel({ status, recentResults, pendingEntries }: GeminiQueuePanelProps) {
+  const { slots, nowMs } = useDisplaySlots(recentResults, pendingEntries, status.processing);
+
+  const hasContent = slots.length > 0 || status.processing;
+
+  if (!hasContent && status.pending === 0 && status.processed === 0) return null;
 
   return (
     <motion.div
@@ -174,10 +217,10 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
         </div>
       )}
 
-      {/* Queue items - each shows entry text + analysis for 10 seconds */}
-      {(displayItems.length > 0 || status.processing) && (
-        <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-          {displayItems.length === 0 && status.processing && (
+      {/* 5-slot queue visualizer */}
+      {(slots.length > 0 || status.processing) && (
+        <div className="p-4 space-y-2 max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+          {slots.length === 0 && status.processing && (
             <motion.div
               animate={{ opacity: [0.3, 0.7, 0.3] }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -188,61 +231,151 @@ export function GeminiQueuePanel({ status, recentResults }: GeminiQueuePanelProp
             </motion.div>
           )}
           <AnimatePresence initial={false}>
-            {displayItems.map((item) => {
-              const timeLeft = Math.max(0, Math.ceil((item.expiresAt - nowMs) / 1000));
-              const moodColor = getMoodColorForPanel(item.mood);
+            {slots.map((slot) => {
+              const key = slot.kind === "completed" ? slot.result.id : slot.entry.id;
               return (
                 <motion.div
-                  key={item.id}
+                  key={key}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10, height: 0 }}
-                  transition={{ duration: 0.3 }}
+                  exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
+                  transition={{ duration: 0.35 }}
                   className="rounded-xl bg-[var(--bg-surface)]/50 border border-[var(--line)]/40 overflow-hidden"
                 >
-                  {/* Entry text being analyzed */}
-                  <div className="px-4 py-3 border-b border-[var(--line)]/20 bg-[var(--bg-surface)]/30">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-mono text-[var(--text-muted)]">{item.date}</span>
-                      <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-surface)]/60 px-1.5 py-0.5 rounded">{timeLeft}s</span>
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3">
-                      {item.text || item.description}
-                    </p>
-                  </div>
-
-                  {/* Analysis result */}
-                  <div className="px-4 py-3">
-                    {/* Score header */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-base">{item.emoji}</span>
-                      <span
-                        className="text-sm font-bold font-mono"
-                        style={{ color: moodColor }}
-                      >
-                        {item.rating}/100
-                      </span>
-                    </div>
-                    
-                    {/* Paragraph analysis - noteworthy thoughts */}
-                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-2">
-                      {item.geminiRationale}
-                    </p>
-                    
-                    {/* Sentence summary */}
-                    <div 
-                      className="text-[11px] font-semibold border-t border-[var(--line)]/30 pt-2"
-                      style={{ color: moodColor }}
-                    >
-                      {item.description}
-                    </div>
-                  </div>
+                  {slot.kind === "active" && <ActiveSlotView entry={slot.entry} />}
+                  {slot.kind === "pending" && <PendingSlotView entry={slot.entry} />}
+                  {slot.kind === "completed" && <CompletedSlotView result={slot.result} expiresAt={slot.expiresAt} nowMs={nowMs} />}
                 </motion.div>
               );
             })}
           </AnimatePresence>
         </div>
       )}
+    </motion.div>
+  );
+}
+
+// ── Active: top-most entry being analyzed ────────────────────────────────
+function ActiveSlotView({ entry }: { entry: PendingDisplayEntry }) {
+  return (
+    <div className="relative">
+      {/* Scanning glow bar */}
+      <motion.div
+        className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[var(--neon-cyan)] to-transparent"
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
+      />
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+          >
+            <Loader2 className="h-3 w-3 text-[var(--neon-cyan)]" />
+          </motion.div>
+          <span className="text-[10px] font-mono text-[var(--neon-cyan)]">ANALYZING</span>
+          {entry.date && (
+            <span className="text-[10px] font-mono text-[var(--text-muted)] ml-auto">{entry.date}</span>
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-primary)] leading-relaxed line-clamp-3">
+          {entry.text}
+        </p>
+        {/* Pulsing analysis placeholder */}
+        <div className="mt-2 space-y-1.5">
+          <motion.div
+            animate={{ opacity: [0.15, 0.3, 0.15] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+            className="h-2.5 rounded bg-[var(--neon-cyan)]/20 w-4/5"
+          />
+          <motion.div
+            animate={{ opacity: [0.1, 0.25, 0.1] }}
+            transition={{ duration: 1.8, repeat: Infinity, delay: 0.3 }}
+            className="h-2.5 rounded bg-[var(--neon-cyan)]/20 w-3/5"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pending: waiting in queue ────────────────────────────────────────────
+function PendingSlotView({ entry }: { entry: PendingDisplayEntry }) {
+  return (
+    <div className="px-4 py-2.5 opacity-50">
+      <div className="flex items-center gap-2 mb-1">
+        <Clock className="h-3 w-3 text-[var(--text-muted)]" />
+        <span className="text-[10px] font-mono text-[var(--text-muted)]">QUEUED</span>
+        {entry.date && (
+          <span className="text-[10px] font-mono text-[var(--text-muted)] ml-auto">{entry.date}</span>
+        )}
+      </div>
+      <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+        {entry.text}
+      </p>
+    </div>
+  );
+}
+
+// ── Completed: shows results for 10s then blinks away ────────────────────
+function CompletedSlotView({
+  result,
+  expiresAt,
+  nowMs,
+}: {
+  result: QueueLogItem;
+  expiresAt: number;
+  nowMs: number;
+}) {
+  const timeLeft = Math.max(0, Math.ceil((expiresAt - nowMs) / 1000));
+  const moodColor = getMoodColorForPanel(result.mood);
+  // Blink effect in last 2 seconds
+  const isBlinking = timeLeft <= 2;
+
+  return (
+    <motion.div
+      animate={isBlinking ? { opacity: [1, 0.3, 1, 0.3, 1] } : { opacity: 1 }}
+      transition={isBlinking ? { duration: 1, repeat: Infinity } : {}}
+    >
+      {/* Entry text */}
+      <div className="px-4 py-3 border-b border-[var(--line)]/20 bg-[var(--bg-surface)]/30">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] font-mono text-[var(--text-muted)]">{result.date}</span>
+          <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-surface)]/60 px-1.5 py-0.5 rounded">
+            {timeLeft}s
+          </span>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3">
+          {result.text || result.description}
+        </p>
+      </div>
+
+      {/* Analysis result */}
+      <div className="px-4 py-3">
+        {/* Score header */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">{result.emoji}</span>
+          <span
+            className="text-sm font-bold font-mono"
+            style={{ color: moodColor }}
+          >
+            {result.rating}/100
+          </span>
+        </div>
+
+        {/* Paragraph analysis */}
+        <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-2">
+          {result.geminiRationale}
+        </p>
+
+        {/* Sentence summary */}
+        <div
+          className="text-[11px] font-semibold border-t border-[var(--line)]/30 pt-2"
+          style={{ color: moodColor }}
+        >
+          {result.description}
+        </div>
+      </div>
     </motion.div>
   );
 }

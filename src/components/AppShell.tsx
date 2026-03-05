@@ -495,7 +495,7 @@ export function AppShell() {
   const { user, loading: authLoading, signOut, isGuest, isAdmin, signInAsAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
   const { aiKey, hydrated: aiKeyHydrated, hasKey, setAiKey } = useAiKey(user?.uid ?? null);
-  const { status: queueStatus, recentResults, startQueue, stopQueue } = useMoodAnalysisQueue(
+  const { status: queueStatus, recentResults, pendingEntries, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
     aiKey || null,
     aiKeyHydrated
@@ -761,7 +761,7 @@ export function AppShell() {
             className="flex flex-col gap-6 mb-10"
           >
             {/* AI Processing Queue - Top */}
-            <GeminiQueuePanel status={queueStatus} recentResults={recentResults} />
+            <GeminiQueuePanel status={queueStatus} recentResults={recentResults} pendingEntries={pendingEntries} />
 
             {/* Top: Entry composer */}
             <motion.div
