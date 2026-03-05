@@ -210,6 +210,8 @@ export function ChatComposer({
 
     if (file.name.endsWith('.txt')) {
       onBatchImport?.(file);
+    } else if (file.type.startsWith('image/')) {
+      setImageFile(file);
     }
   }
 

@@ -546,8 +546,8 @@ export function AppShell() {
   const { aiKey, hydrated: aiKeyHydrated } = useAiKey(user?.uid ?? null);
   const { status: queueStatus, recentResults, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
-    aiKey,
-    aiKeyHydrated && !!aiKey
+    aiKey || null,
+    aiKeyHydrated
   );
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");
@@ -901,6 +901,7 @@ export function AppShell() {
                   newestChatId={newestChatId}
                   highlightChatId={highlightChatId}
                   onSelectChat={(id) => {
+                    setHighlightChatId(id);
                     const el = document.getElementById(`chat-${id}`);
                     el?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
