@@ -825,7 +825,7 @@ export function AppShell() {
               }}
             >
               <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10"
+                className="absolute inset-0 bg-gradient-to-br from-[var(--glow-purple)]/10 via-transparent to-[var(--glow-cyan)]/10 pointer-events-none"
                 animate={{
                   opacity: [0.3, 0.5, 0.3],
                 }}
@@ -857,7 +857,6 @@ export function AppShell() {
                     const el = document.getElementById(`chat-${id}`);
                     el?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}
-                  uid={user?.uid}
                 />
               </div>
             </motion.section>
@@ -913,6 +912,7 @@ export function AppShell() {
             loading={chatsLoading}
             error={error}
             highlightChatId={highlightChatId}
+            uid={user?.uid}
             onDelete={isGuest ? undefined : async (id) => {
               if (!user?.uid) return;
               await deleteChat(user.uid, id);

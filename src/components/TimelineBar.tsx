@@ -6,7 +6,6 @@ import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
 
 import type { Chat } from "@/lib/chats";
-import { updateMoodRating } from "@/lib/chats";
 import { useElementSize } from "@/lib/hooks/useElementSize";
 import { cn } from "@/lib/utils";
 import { MoodRationaleModal } from "@/components/MoodRationaleModal";
@@ -67,7 +66,6 @@ const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
 const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
-const DRAG_CLICK_DEBOUNCE_MS = 50;   // Delay before clearing drag flag so onClick doesn't fire after a real drag
 
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
@@ -155,7 +153,6 @@ const GlowingDot = memo(function GlowingDot({
   onShowRationale,
   size,
   yOffset,
-  uid,
 }: {
   chat: Chat;
   isNewest?: boolean;
@@ -164,12 +161,9 @@ const GlowingDot = memo(function GlowingDot({
   onShowRationale?: () => void;
   size: number;
   yOffset: number;
-  uid?: string;
 }) {
   const rating = chat.moodAnalysis?.rating ?? 50;
-  const [dragRating, setDragRating] = useState<number | null>(null);
-  const isDraggingRatingRef = useRef(false);
-  const displayRating = dragRating !== null ? dragRating : rating;
+  const displayRating = rating;
   const moodColor = ratingToColor(displayRating);
   // Parse the rgb color to create an rgba version for glow effects
   const rgbMatch = moodColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
@@ -178,7 +172,6 @@ const GlowingDot = memo(function GlowingDot({
     : 'rgba(0,245,255,0.6)';
   
   const handleClick = () => {
-    if (isDraggingRatingRef.current) return;
     if (onClick) {
       onClick();
     }
@@ -191,63 +184,6 @@ const GlowingDot = memo(function GlowingDot({
     }
   };
   
-  // Drag-to-adjust rating: drag up to increase, down to decrease
-  const latestDragRatingRef = useRef<number | null>(null);
-  const didDragRef = useRef(false);
-  const handleRatingDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const touch = 'touches' in e ? e.touches[0] : undefined;
-    const startY = touch ? touch.clientY : (e as React.MouseEvent).clientY;
-    const startRating = rating;
-    didDragRef.current = false;
-    
-    const handleMove = (ev: MouseEvent | TouchEvent) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const moveTouch = 'touches' in ev ? (ev as TouchEvent).touches[0] : undefined;
-      const currentY = moveTouch ? moveTouch.clientY : (ev as MouseEvent).clientY;
-      // Drag up = increase rating, drag down = decrease
-      const dy = startY - currentY;
-      const sensitivity = 2; // pixels per rating point
-      const delta = Math.round(dy / sensitivity);
-      if (delta !== 0) {
-        didDragRef.current = true;
-        isDraggingRatingRef.current = true;
-      }
-      const newRating = Math.max(1, Math.min(100, startRating + delta));
-      latestDragRatingRef.current = newRating;
-      setDragRating(newRating);
-    };
-    
-    const handleUp = () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-      window.removeEventListener("touchmove", handleMove);
-      window.removeEventListener("touchend", handleUp);
-      
-      // Persist the new rating using the ref to get the latest value
-      const finalRating = latestDragRatingRef.current;
-      if (uid && finalRating !== null && finalRating !== startRating && didDragRef.current) {
-        void updateMoodRating(uid, chat.id, finalRating);
-      }
-      latestDragRatingRef.current = null;
-      setDragRating(null);
-      
-      if (didDragRef.current) {
-        // Delay clearing the drag flag so onClick doesn't fire after a real drag
-        setTimeout(() => { isDraggingRatingRef.current = false; }, DRAG_CLICK_DEBOUNCE_MS);
-      }
-      // If no drag occurred (simple click), isDraggingRatingRef stays false
-      // so the parent button's onClick (handleClick) will fire normally
-    };
-    
-    window.addEventListener("mousemove", handleMove, { passive: false });
-    window.addEventListener("mouseup", handleUp);
-    window.addEventListener("touchmove", handleMove, { passive: false });
-    window.addEventListener("touchend", handleUp);
-  }, [rating, uid, chat.id]);
-    
   return (
     <div className="relative group/dot">
       <motion.button
@@ -255,7 +191,7 @@ const GlowingDot = memo(function GlowingDot({
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         aria-label={`${format(chat.createdAt, "MMMM d, yyyy 'at' h:mm a")}${chat.moodAnalysis ? `, Mood: ${chat.moodAnalysis.description}, Rating: ${chat.moodAnalysis.rating} out of 100` : ''}`}
-        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}\n\nDrag rating up/down to adjust\nDouble-click for detailed analysis`}
+        title={`${format(chat.createdAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}\n\n${chat.excerpt}${chat.moodAnalysis ? `\n\nMood: ${chat.moodAnalysis.emoji} ${chat.moodAnalysis.rating}/100 - ${chat.moodAnalysis.description}\n${chat.moodAnalysis.rationale}` : ''}\n\nDouble-click for detailed analysis`}
         initial={{ opacity: 0, scale: 0.3, y: 10 }}
         animate={{
           opacity: 1,
@@ -292,17 +228,14 @@ const GlowingDot = memo(function GlowingDot({
             : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
-        {/* Rating number inside circle - draggable up/down */}
+        {/* Rating number inside circle - display only */}
         <span 
-          className="font-bold font-mono select-none"
+          className="font-bold font-mono select-none pointer-events-none"
           style={{
             fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
-            color: dragRating !== null ? 'rgba(255, 255, 100, 1)' : 'rgba(255, 255, 255, 0.95)',
+            color: 'rgba(255, 255, 255, 0.95)',
             textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
-            cursor: 'ns-resize',
           }}
-          onMouseDown={handleRatingDragStart}
-          onTouchStart={handleRatingDragStart}
         >
           {displayRating}
         </span>
@@ -534,13 +467,11 @@ export function TimelineBar({
   newestChatId,
   highlightChatId,
   onSelectChat,
-  uid,
 }: {
   groupedByDay: Map<string, Chat[]>;
   newestChatId?: string;
   highlightChatId?: string | null;
   onSelectChat?: (chatId: string) => void;
-  uid?: string;
 }) {
   const { ref: viewportRef, width: viewportWidth } = useElementSize<HTMLDivElement>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -709,9 +640,9 @@ export function TimelineBar({
   const maxDateStr = allDays.length > 0 ? allDays[allDays.length - 1]!.dayKey : "";
 
   return (
-    <div className="flex h-full flex-col px-6 py-6">
+    <div className="flex h-full flex-col px-6 py-6 relative">
       {/* Header with date range controls */}
-      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap relative z-10">
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -1100,7 +1031,6 @@ export function TimelineBar({
                               }}
                               size={dotPx}
                               yOffset={0}
-                              uid={uid}
                             />
                           </div>
                         );
