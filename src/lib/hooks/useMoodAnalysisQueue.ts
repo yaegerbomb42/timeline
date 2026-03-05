@@ -40,6 +40,7 @@ type QueueStatus = {
 const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
 const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
+const FETCH_TIMEOUT_MS = 90_000; // 90 seconds max for a single API call
 
 /**
  * Hook to manage background mood analysis queue
@@ -119,11 +120,21 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         headers["x-timeline-ai-key"] = apiKey;
       }
 
-      const response = await fetch("/api/mood-analysis", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ entries }),
-      });
+      // Use AbortController to prevent indefinite hangs when the API doesn't respond
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/mood-analysis", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ entries }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         const error = await response.json();
@@ -184,6 +195,10 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     } catch (error: any) {
       if (error.message === "RATE_LIMITED") {
         throw error; // Re-throw to handle specially
+      }
+      if (error.name === "AbortError") {
+        console.error("Mood analysis request timed out after", FETCH_TIMEOUT_MS / 1000, "seconds");
+        return 0;
       }
       console.error("Batch processing error:", error);
       return 0;

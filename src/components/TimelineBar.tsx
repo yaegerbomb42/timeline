@@ -62,7 +62,7 @@ function ratingToColor(rating: number): string {
     return `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
   }
 }
-const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
+const MIN_SLOT_WIDTH_PX = 40;         // Minimum slot width in pixels (allows scrolling with moderate entry counts)
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
 const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
