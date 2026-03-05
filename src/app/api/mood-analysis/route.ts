@@ -100,7 +100,7 @@ function mapResults(
       (result.description as string) || "No description available",
     emoji: (result.emoji as string) || "😐",
     rationale:
-      (result.description as string) || "No analysis available",
+      (result.rationale as string) || (result.description as string) || "No analysis available",
     geminiRationale:
       (result.geminiRationale as string) || "No detailed analysis available",
     score: Math.max(

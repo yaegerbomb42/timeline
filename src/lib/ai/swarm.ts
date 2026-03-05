@@ -41,7 +41,7 @@ function getEnvKeys(prefix: string, count: number): string[] {
 export function getProviders(): ProviderConfig[] {
   const providers: ProviderConfig[] = [];
 
-  const groqKeys = getEnvKeys("GROQ_API_KEY", 0);
+  const groqKeys = getEnvKeys("GROQ_API_KEY", 1);
   if (groqKeys.length > 0) {
     providers.push({
       name: "groq",
@@ -61,7 +61,7 @@ export function getProviders(): ProviderConfig[] {
     });
   }
 
-  const fireworksKeys = getEnvKeys("FIREWORKS_API_KEY", 0);
+  const fireworksKeys = getEnvKeys("FIREWORKS_API_KEY", 1);
   if (fireworksKeys.length > 0) {
     providers.push({
       name: "fireworks",
