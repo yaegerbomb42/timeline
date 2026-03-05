@@ -33,6 +33,7 @@ type QueueStatus = {
 
 const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
+const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
 
 /**
  * Hook to manage background mood analysis queue
@@ -51,7 +52,6 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   const processingRef = useRef(false);
   const abortRef = useRef(false);
   const consecutiveFailsRef = useRef(0);
-  const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
 
   // Count pending entries that need mood analysis
   useEffect(() => {
@@ -98,8 +98,8 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
-      // Only send the API key header if the user has configured one;
-      // the server-side route falls back to process.env.GEMINI_API_KEY
+      // Only send the API key header if the user has configured one.
+      // The server-side route falls back to process.env.GEMINI_API_KEY.
       if (apiKey) {
         headers["x-timeline-ai-key"] = apiKey;
       }

@@ -67,6 +67,7 @@ const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
 const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
+const DRAG_CLICK_DEBOUNCE_MS = 50;   // Delay before clearing drag flag so onClick doesn't fire after a real drag
 
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
@@ -235,7 +236,7 @@ const GlowingDot = memo(function GlowingDot({
       
       if (didDragRef.current) {
         // Delay clearing the drag flag so onClick doesn't fire after a real drag
-        setTimeout(() => { isDraggingRatingRef.current = false; }, 50);
+        setTimeout(() => { isDraggingRatingRef.current = false; }, DRAG_CLICK_DEBOUNCE_MS);
       }
       // If no drag occurred (simple click), isDraggingRatingRef stays false
       // so the parent button's onClick (handleClick) will fire normally
