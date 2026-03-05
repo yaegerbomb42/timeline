@@ -1,6 +1,6 @@
 "use client";
 
-import { format, parse, isAfter, isBefore, startOfDay } from "date-fns";
+import { format, parse, isAfter, isBefore, startOfDay, addDays } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Sparkles, Calendar } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
@@ -34,16 +34,23 @@ const CURVE_TENSION_DEFAULT = 0.6;  // Standard horizontal control point ratio
 const CURVE_TENSION_STEEP = 0.5;    // For large vertical mood changes (>50px)
 const STEEP_THRESHOLD = 50;          // Y-distance threshold for reduced tension
 
-// Calculate dynamic node size based on visible event count
-function getDynamicNodeSize(visibleCount: number): number {
-  if (visibleCount > 3000) return 10;
-  if (visibleCount > 1500) return 12;
-  if (visibleCount > 800) return 14;
-  if (visibleCount > 400) return 16;
-  if (visibleCount > 200) return 18;
-  if (visibleCount > 100) return 20;
-  if (visibleCount > 50) return 22;
-  return 26;
+// Calculate dynamic node size based on visible event count and slot width
+function getDynamicNodeSize(visibleCount: number, slotWidth: number): number {
+  // When slots are very narrow, shrink nodes to fit
+  const sizeBySlot = Math.max(3, slotWidth * 0.8);
+
+  // Size by count as fallback
+  let sizeByCount: number;
+  if (visibleCount > 3000) sizeByCount = 4;
+  else if (visibleCount > 1500) sizeByCount = 6;
+  else if (visibleCount > 800) sizeByCount = 8;
+  else if (visibleCount > 400) sizeByCount = 12;
+  else if (visibleCount > 200) sizeByCount = 16;
+  else if (visibleCount > 100) sizeByCount = 20;
+  else if (visibleCount > 50) sizeByCount = 22;
+  else sizeByCount = 26;
+
+  return Math.min(sizeByCount, sizeBySlot);
 }
 
 // Scaling constants for dynamic font/stroke sizing
@@ -62,10 +69,10 @@ function ratingToColor(rating: number): string {
     return `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
   }
 }
-const MIN_SLOT_WIDTH_PX = 40;         // Minimum slot width in pixels (allows scrolling with moderate entry counts)
-const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
+const MIN_SLOT_WIDTH_PX = 1;          // Minimum slot width in pixels – allows dense timelines spanning years to fit in viewport
+const MIN_STROKE_WIDTH = 1;          // Minimum rollercoaster line width (for very dense views)
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
-const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
+const STROKE_SLOT_RATIO = 6;         // Divisor: slotWidth / this = stroke width
 
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
@@ -216,7 +223,8 @@ const GlowingDot = memo(function GlowingDot({
         whileHover={{ scale: 1.4, y: yOffset - 3 }}
         whileTap={{ scale: 0.9 }}
         className={cn(
-          "relative rounded-full cursor-pointer focus:outline-none focus:ring-4 z-10 border-2 flex items-center justify-center",
+          "relative rounded-full cursor-pointer focus:outline-none z-10 flex items-center justify-center",
+          size >= 12 ? "border-2 focus:ring-4" : size >= 6 ? "border focus:ring-2" : "focus:ring-1",
         )}
         style={{
           width: size,
@@ -228,7 +236,8 @@ const GlowingDot = memo(function GlowingDot({
             : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
-        {/* Rating number inside circle - display only */}
+        {/* Rating number inside circle - display only, hidden when node is too small */}
+        {size >= 10 && (
         <span 
           className="font-bold font-mono select-none pointer-events-none"
           style={{
@@ -239,6 +248,7 @@ const GlowingDot = memo(function GlowingDot({
         >
           {displayRating}
         </span>
+        )}
         {isNewest && (
           <motion.div
             className="absolute inset-0 rounded-full"
@@ -273,23 +283,13 @@ function SwipeableDateInput({
   const day = parsed ? parsed.getDate() : 1;
   const year = parsed ? parsed.getFullYear() : new Date().getFullYear();
   
-  // Track which segment is currently being dragged for visual feedback
-  const [activeSegment, setActiveSegment] = useState<"month" | "day" | "year" | null>(null);
+  // Track whether a drag is in progress for visual feedback
+  const [isDragging, setIsDragging] = useState(false);
   // Track whether native date input is shown
   const [showNativeInput, setShowNativeInput] = useState(false);
   const nativeInputRef = useRef<HTMLInputElement>(null);
   
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  
-  // Use refs to hold the latest values so the mousemove closure always has current data
-  const latestMonth = useRef(month);
-  const latestDay = useRef(day);
-  const latestYear = useRef(year);
-  useEffect(() => {
-    latestMonth.current = month;
-    latestDay.current = day;
-    latestYear.current = year;
-  }, [month, day, year]);
   
   // Focus native input when shown
   useEffect(() => {
@@ -298,27 +298,26 @@ function SwipeableDateInput({
     }
   }, [showNativeInput]);
   
-  function clampDate(y: number, m: number, d: number): string {
-    m = Math.max(0, Math.min(11, m));
-    y = Math.max(2000, Math.min(2099, y));
-    const maxDay = new Date(y, m + 1, 0).getDate();
-    d = Math.max(1, Math.min(maxDay, d));
-    const result = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  function clampDateStr(d: Date): string {
+    const result = format(d, "yyyy-MM-dd");
     if (min && result < min) return min;
     if (max && result > max) return max;
     return result;
   }
   
-  function handleSegDrag(segment: "month" | "day" | "year", e: React.MouseEvent | React.TouchEvent) {
+  // Unified drag handler: dragging anywhere on the date control moves the
+  // entire date by days.  Sensitivity is tuned so that a moderate drag
+  // (~3 inches / ~288 px) can traverse several years worth of days.
+  function handleUnifiedDrag(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
     e.stopPropagation();
     const touch = 'touches' in e ? e.touches[0] : undefined;
     const startX = touch ? touch.clientX : (e as React.MouseEvent).clientX;
-    const startVal = segment === "month" ? month : segment === "day" ? day : year;
-    let lastDelta = 0;
+    const startDate = parsed ?? new Date();
+    let lastDayDelta = 0;
     let moved = false;
     
-    setActiveSegment(segment);
+    setIsDragging(true);
     
     const handleMove = (ev: MouseEvent | TouchEvent) => {
       ev.preventDefault();
@@ -330,30 +329,35 @@ function SwipeableDateInput({
         currentX = (ev as MouseEvent).clientX;
       }
       const dx = currentX - startX;
-      // Lower sensitivity = easier to drag. Year needs more precision.
-      const sensitivity = segment === "year" ? 25 : 12;
-      const delta = Math.round(dx / sensitivity);
-      
+
       if (Math.abs(dx) > 3) moved = true;
-      
-      // Only fire onChange when delta actually changes to avoid redundant updates
-      if (delta !== lastDelta) {
-        lastDelta = delta;
-        // Use refs for the OTHER two segments to get latest values
-        let newMonth = latestMonth.current;
-        let newDay = latestDay.current;
-        let newYear = latestYear.current;
-        if (segment === "month") newMonth = startVal + delta;
-        else if (segment === "day") newDay = startVal + delta;
-        else newYear = startVal + delta;
-        
-        const newDate = clampDate(newYear, newMonth, newDay);
-        onChange(newDate);
+
+      // Accelerating sensitivity: small drags move slowly (fine control),
+      // larger drags accelerate so you can cover years quickly.
+      // Base: 1 day per 4px for the first 50px of drag,
+      // then acceleration ramps up quadratically.
+      const absDx = Math.abs(dx);
+      let dayDelta: number;
+      if (absDx <= 50) {
+        dayDelta = Math.round(dx / 4);
+      } else {
+        // First 50px = 12.5 days, then accelerate
+        const extra = absDx - 50;
+        const baseDays = 12.5;
+        // Quadratic acceleration: extra^1.5 / 8 gives rapid traversal
+        const accelDays = Math.pow(extra, 1.5) / 8;
+        dayDelta = Math.round(Math.sign(dx) * (baseDays + accelDays));
+      }
+
+      if (dayDelta !== lastDayDelta) {
+        lastDayDelta = dayDelta;
+        const newDate = addDays(startDate, dayDelta);
+        onChange(clampDateStr(newDate));
       }
     };
     
     const handleUp = () => {
-      setActiveSegment(null);
+      setIsDragging(false);
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
       window.removeEventListener("touchmove", handleMove);
@@ -413,48 +417,41 @@ function SwipeableDateInput({
   }
   
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/80 overflow-hidden select-none">
+    <div
+      className={cn(
+        "flex items-center gap-0.5 rounded-lg border bg-[var(--bg-surface)]/80 overflow-hidden select-none cursor-ew-resize transition-all",
+        isDragging
+          ? "border-[var(--neon-cyan)] scale-105 shadow-[0_0_10px_var(--glow-cyan)]"
+          : "border-[var(--line)] hover:border-[var(--neon-cyan)]"
+      )}
+      data-date-segment="true"
+      onMouseDown={handleUnifiedDrag}
+      onTouchStart={handleUnifiedDrag}
+      title="Drag left/right to change date rapidly, or click to type"
+    >
       <div
-        data-date-segment="true"
-        onMouseDown={(e) => handleSegDrag("month", e)}
-        onTouchStart={(e) => handleSegDrag("month", e)}
         className={cn(
-          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
-          activeSegment === "month"
-            ? "bg-[var(--neon-cyan)]/20 scale-110 text-[var(--neon-cyan)]"
-            : "text-[var(--neon-cyan)] hover:bg-[var(--neon-cyan)]/10 hover:scale-110 active:scale-95"
+          "px-2 py-1.5 text-xs font-mono transition-all",
+          isDragging ? "text-[var(--neon-cyan)]" : "text-[var(--neon-cyan)]"
         )}
-        title="Drag left/right to change month, or click to type"
       >
         {monthNames[month]}
       </div>
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
-        data-date-segment="true"
-        onMouseDown={(e) => handleSegDrag("day", e)}
-        onTouchStart={(e) => handleSegDrag("day", e)}
         className={cn(
-          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
-          activeSegment === "day"
-            ? "bg-[var(--neon-purple)]/20 scale-110 text-[var(--neon-purple)]"
-            : "text-[var(--neon-purple)] hover:bg-[var(--neon-purple)]/10 hover:scale-110 active:scale-95"
+          "px-2 py-1.5 text-xs font-mono transition-all",
+          isDragging ? "text-[var(--neon-purple)]" : "text-[var(--neon-purple)]"
         )}
-        title="Drag left/right to change day, or click to type"
       >
         {String(day).padStart(2, "0")}
       </div>
       <span className="text-[var(--text-muted)] text-[10px]">/</span>
       <div
-        data-date-segment="true"
-        onMouseDown={(e) => handleSegDrag("year", e)}
-        onTouchStart={(e) => handleSegDrag("year", e)}
         className={cn(
-          "px-2 py-1.5 text-xs font-mono cursor-ew-resize transition-all",
-          activeSegment === "year"
-            ? "bg-[var(--neon-pink)]/20 scale-110 text-[var(--neon-pink)]"
-            : "text-[var(--neon-pink)] hover:bg-[var(--neon-pink)]/10 hover:scale-110 active:scale-95"
+          "px-2 py-1.5 text-xs font-mono transition-all",
+          isDragging ? "text-[var(--neon-pink)]" : "text-[var(--neon-pink)]"
         )}
-        title="Drag left/right to change year, or click to type"
       >
         {year}
       </div>
@@ -521,13 +518,19 @@ export function TimelineBar({
     const count = days.length || 1;
     const available = viewportWidth || 600;
     
-    // Distribute width evenly across all visible days to fill viewport
+    // Distribute width evenly across all visible days to fill viewport.
+    // For large datasets the slots will be very narrow (< 1px) which is fine –
+    // the SVG path still renders a smooth rollercoaster and nodes shrink or
+    // hide automatically.
     const slot = Math.max(MIN_SLOT_WIDTH_PX, available / count);
     const track = slot * count;
     
-    // Label stride adapts to available space per slot
+    // Label stride adapts to available space per slot – when very dense only
+    // show labels at wide intervals.
     let stride: number;
-    if (slot < 15) stride = Math.max(50, Math.ceil(400 / slot));
+    if (slot < 3) stride = Math.max(200, Math.ceil(1000 / slot));
+    else if (slot < 8) stride = Math.max(100, Math.ceil(600 / slot));
+    else if (slot < 15) stride = Math.max(50, Math.ceil(400 / slot));
     else if (slot < 30) stride = Math.max(20, Math.ceil(200 / slot));
     else if (slot < 60) stride = Math.max(7, Math.ceil(80 / slot));
     else stride = Math.max(1, Math.ceil(40 / slot));
@@ -535,8 +538,8 @@ export function TimelineBar({
     return { slotWidth: slot, trackWidth: Math.max(track, available), labelStride: stride };
   }, [viewportWidth, days.length]);
 
-  // Dynamic node size based on visible count
-  const dotPx = useMemo(() => getDynamicNodeSize(days.length), [days.length]);
+  // Dynamic node size based on visible count and slot width
+  const dotPx = useMemo(() => getDynamicNodeSize(days.length, slotWidth), [days.length, slotWidth]);
 
   // Keyboard shortcuts: arrow keys to scroll
   useEffect(() => {
@@ -1060,7 +1063,7 @@ export function TimelineBar({
 
       {/* Navigation hint */}
       <div className="mt-2 text-[10px] text-[var(--text-muted)] font-sans text-center">
-        Arrow keys to scroll • Drag to pan • Pick dates above to filter range
+        Arrow keys to scroll • Drag to pan • Drag date pickers to move through time rapidly
       </div>
 
       {/* Mood Rationale Modal */}
