@@ -23,55 +23,6 @@ import { useMoodAnalysisQueue } from "@/lib/hooks/useMoodAnalysisQueue";
 import { useAiKey } from "@/lib/ai/useAiKey";
 import { cn } from "@/lib/utils";
 
-// Animated background particles
-function FloatingParticles() {
-  const [particles] = useState(() =>
-    Array.from({ length: 20 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      delay: Math.random() * 5,
-      duration: 10 + Math.random() * 10,
-      width: Math.random() * 4 + 2,
-      height: Math.random() * 4 + 2,
-      opacity: 0.3 + Math.random() * 0.4,
-      blur: Math.random() * 10 + 5,
-      xMovement: Math.random() * 20 - 10,
-    }))
-  );
-
-  return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      {particles.map((p) => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.width,
-            height: p.height,
-            background: `radial-gradient(circle, rgba(0, 245, 255, ${p.opacity}), transparent)`,
-            boxShadow: `0 0 ${p.blur}px rgba(0, 245, 255, 0.5)`,
-          }}
-          animate={{
-            y: [0, -30, 0],
-            x: [0, p.xMovement, 0],
-            opacity: [0.3, 1, 0.3],
-            scale: [1, 1.5, 1],
-          }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 // Parallax header with depth
 function ParallaxHeader({ 
   scrollY, 
@@ -104,7 +55,7 @@ function ParallaxHeader({
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           className="relative font-book text-6xl md:text-7xl font-bold tracking-tight"
         >
-          <span className="bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)] bg-clip-text text-transparent animate-pulse">
+          <span className="bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-purple)] to-[var(--neon-pink)] bg-clip-text text-transparent">
             Timeline
           </span>
           <motion.div
@@ -543,11 +494,11 @@ function AdminPasswordModal({
 export function AppShell() {
   const { user, loading: authLoading, signOut, isGuest, isAdmin, signInAsAdmin } = useAuth();
   const { chats, groupedByDay, loading: chatsLoading, error } = useChats(user?.uid);
-  const { aiKey, hydrated: aiKeyHydrated } = useAiKey(user?.uid ?? null);
+  const { aiKey, hydrated: aiKeyHydrated, hasKey, setAiKey } = useAiKey(user?.uid ?? null);
   const { status: queueStatus, recentResults, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
-    aiKey,
-    aiKeyHydrated && !!aiKey
+    aiKey || null,
+    aiKeyHydrated
   );
   const [sending, setSending] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "oldest">("newest");
@@ -814,14 +765,15 @@ export function AppShell() {
 
             {/* Top: Entry composer */}
             <motion.div
-              animate={{
-                scale: [1, 1.01, 1],
-              }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
               className="w-full"
             >
               <ChatComposer
                 disabled={sending}
+                hasApiKey={aiKeyHydrated ? hasKey : undefined}
+                onSetApiKey={(key) => void setAiKey(key)}
                 onSendStart={(start) => {
                   const startX = start.left + start.width / 2;
                   const startY = start.top + start.height / 2;
@@ -901,6 +853,7 @@ export function AppShell() {
                   newestChatId={newestChatId}
                   highlightChatId={highlightChatId}
                   onSelectChat={(id) => {
+                    setHighlightChatId(id);
                     const el = document.getElementById(`chat-${id}`);
                     el?.scrollIntoView({ behavior: "smooth", block: "center" });
                   }}

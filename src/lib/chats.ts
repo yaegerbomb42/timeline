@@ -77,13 +77,14 @@ export async function addChat(uid: string, text: string, imageFile?: File) {
   let imageUrl: string | undefined = undefined;
   if (imageFile) {
     try {
-      const imagePath = `users/${uid}/images/${now.getTime()}_${imageFile.name}`;
+      // Sanitize filename to avoid special character issues
+      const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const imagePath = `users/${uid}/images/${now.getTime()}_${safeName}`;
       const storageRef = ref(storage, imagePath);
       await uploadBytes(storageRef, imageFile);
       imageUrl = await getDownloadURL(storageRef);
     } catch (error) {
       console.error('Failed to upload image:', error);
-      // Continue without image if upload fails
       throw new Error('Image upload failed. Please try again.');
     }
   }

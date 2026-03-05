@@ -33,6 +33,7 @@ type QueueStatus = {
 
 const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
+const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
 
 /**
  * Hook to manage background mood analysis queue
@@ -50,6 +51,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   
   const processingRef = useRef(false);
   const abortRef = useRef(false);
+  const consecutiveFailsRef = useRef(0);
 
   // Count pending entries that need mood analysis
   useEffect(() => {
@@ -91,19 +93,20 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       console.warn("No UID available for mood analysis");
       return 0;
     }
-    
-    if (!apiKey) {
-      console.warn("No API key available for mood analysis");
-      return 0;
-    }
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      // Only send the API key header if the user has configured one.
+      // The server-side route falls back to process.env.GEMINI_API_KEY.
+      if (apiKey) {
+        headers["x-timeline-ai-key"] = apiKey;
+      }
+
       const response = await fetch("/api/mood-analysis", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-timeline-ai-key": apiKey,
-        },
+        headers,
         body: JSON.stringify({ entries }),
       });
 
@@ -173,7 +176,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   }, [uid, apiKey]);
 
   const processQueue = useCallback(async () => {
-    if (!uid || !apiKey || !enabled || processingRef.current) {
+    if (!uid || !enabled || processingRef.current) {
       return;
     }
 
@@ -203,6 +206,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       setStatus((prev) => ({ ...prev, total: pending.length, processed: 0, errors: 0 }));
 
       // Process in batches
+      let batchSucceeded = false;
       for (let i = 0; i < pending.length; i += BATCH_SIZE) {
         if (abortRef.current) {
           console.log("Queue processing aborted");
@@ -213,6 +217,11 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         
         try {
           const updated = await processBatch(batch);
+          
+          if (updated > 0) {
+            batchSucceeded = true;
+            consecutiveFailsRef.current = 0; // Reset on any success
+          }
           
           setStatus((prev) => ({
             ...prev,
@@ -235,8 +244,13 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
           }
         }
       }
+      
+      if (!batchSucceeded) {
+        consecutiveFailsRef.current++;
+      }
     } catch (error) {
       console.error("Queue processing error:", error);
+      consecutiveFailsRef.current++;
     } finally {
       processingRef.current = false;
       setStatus((prev) => ({ ...prev, processing: false }));
@@ -245,9 +259,10 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       // If so, the onSnapshot listener will update pending count, which will trigger
       // the auto-start effect to run again after a short delay.
     }
-  }, [uid, apiKey, enabled, processBatch]);
+  }, [uid, enabled, processBatch]);
 
   const startQueue = useCallback(() => {
+    consecutiveFailsRef.current = 0; // Manual start always retries
     void processQueue();
   }, [processQueue]);
 
@@ -255,9 +270,11 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     abortRef.current = true;
   }, []);
 
-  // Auto-start processing when there are pending entries and we have an API key.
+  // Auto-start processing when there are pending entries.
   // Uses a timer ref to debounce rapid re-triggers while still reliably restarting
   // when new entries arrive or processing completes with remaining entries.
+  // Stops auto-retrying after MAX_CONSECUTIVE_FAILS consecutive failures to avoid
+  // infinite loops when no API key is available on either client or server.
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Clear any pending auto-start timer when deps change
@@ -269,16 +286,16 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     if (
       enabled &&
       uid &&
-      apiKey &&
       status.pending > 0 &&
       !status.processing &&
-      !processingRef.current
+      !processingRef.current &&
+      consecutiveFailsRef.current < MAX_CONSECUTIVE_FAILS
     ) {
       // Delay before starting to avoid rapid re-triggers after a batch completes
       autoTimerRef.current = setTimeout(() => {
         autoTimerRef.current = null;
         // Re-check all conditions after the delay (state/refs may have changed)
-        if (enabled && uid && apiKey && !processingRef.current) {
+        if (enabled && uid && !processingRef.current && consecutiveFailsRef.current < MAX_CONSECUTIVE_FAILS) {
           void processQueue();
         }
       }, 2000);
@@ -290,7 +307,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         autoTimerRef.current = null;
       }
     };
-  }, [enabled, uid, apiKey, status.pending, status.processing, processQueue]);
+  }, [enabled, uid, status.pending, status.processing, processQueue]);
 
   return {
     status,

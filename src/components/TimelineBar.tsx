@@ -67,6 +67,7 @@ const MIN_SLOT_WIDTH_PX = 8;         // Minimum slot width in pixels
 const MIN_STROKE_WIDTH = 2;          // Minimum rollercoaster line width
 const MAX_STROKE_WIDTH = 6;          // Maximum rollercoaster line width
 const STROKE_SLOT_RATIO = 8;         // Divisor: slotWidth / this = stroke width
+const DRAG_CLICK_DEBOUNCE_MS = 50;   // Delay before clearing drag flag so onClick doesn't fire after a real drag
 
 // Convert a mood rating (1-100) to a y coordinate in the SVG/container
 function ratingToY(rating: number): number {
@@ -192,13 +193,14 @@ const GlowingDot = memo(function GlowingDot({
   
   // Drag-to-adjust rating: drag up to increase, down to decrease
   const latestDragRatingRef = useRef<number | null>(null);
+  const didDragRef = useRef(false);
   const handleRatingDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const touch = 'touches' in e ? e.touches[0] : undefined;
     const startY = touch ? touch.clientY : (e as React.MouseEvent).clientY;
     const startRating = rating;
-    isDraggingRatingRef.current = true;
+    didDragRef.current = false;
     
     const handleMove = (ev: MouseEvent | TouchEvent) => {
       ev.preventDefault();
@@ -209,6 +211,10 @@ const GlowingDot = memo(function GlowingDot({
       const dy = startY - currentY;
       const sensitivity = 2; // pixels per rating point
       const delta = Math.round(dy / sensitivity);
+      if (delta !== 0) {
+        didDragRef.current = true;
+        isDraggingRatingRef.current = true;
+      }
       const newRating = Math.max(1, Math.min(100, startRating + delta));
       latestDragRatingRef.current = newRating;
       setDragRating(newRating);
@@ -222,13 +228,18 @@ const GlowingDot = memo(function GlowingDot({
       
       // Persist the new rating using the ref to get the latest value
       const finalRating = latestDragRatingRef.current;
-      if (uid && finalRating !== null && finalRating !== startRating) {
+      if (uid && finalRating !== null && finalRating !== startRating && didDragRef.current) {
         void updateMoodRating(uid, chat.id, finalRating);
       }
       latestDragRatingRef.current = null;
       setDragRating(null);
-      // Delay clearing the drag flag so onClick doesn't fire
-      setTimeout(() => { isDraggingRatingRef.current = false; }, 50);
+      
+      if (didDragRef.current) {
+        // Delay clearing the drag flag so onClick doesn't fire after a real drag
+        setTimeout(() => { isDraggingRatingRef.current = false; }, DRAG_CLICK_DEBOUNCE_MS);
+      }
+      // If no drag occurred (simple click), isDraggingRatingRef stays false
+      // so the parent button's onClick (handleClick) will fire normally
     };
     
     window.addEventListener("mousemove", handleMove, { passive: false });

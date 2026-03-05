@@ -194,34 +194,47 @@ function TimelineEntry({
             transition={{ delay: index * 0.05 + 0.3 }}
             className={cn(
               "text-[15px] leading-7 text-[var(--text-primary)] font-sans",
-              chat.imageUrl && "flex gap-4"
+              chat.imageUrl && chat.text && "flex gap-4"
             )}
           >
-            {/* Image display - floated left with text wrapping */}
+            {/* Image display */}
             {chat.imageUrl && (
               <motion.div
                 initial={{ opacity: 0, x: -10, scale: 0.95 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 transition={{ delay: index * 0.05 + 0.4, duration: 0.5 }}
-                className="flex-shrink-0 rounded-xl overflow-hidden border border-[var(--line)] bg-[var(--bg-surface)]/40 w-48 h-48"
+                className={cn(
+                  "rounded-xl overflow-hidden border border-[var(--line)] bg-[var(--bg-surface)]/40",
+                  chat.text ? "flex-shrink-0 w-48 h-48" : "w-full max-w-md"
+                )}
                 style={{
                   boxShadow: "0 0 20px rgba(0,245,255,0.2)",
                 }}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={chat.imageUrl}
                   alt="Entry image"
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover bg-[var(--bg-deep)]/40"
+                  className={cn(
+                    "w-full object-cover bg-[var(--bg-deep)]/40",
+                    chat.text ? "h-full" : "max-h-80"
+                  )}
                 />
               </motion.div>
             )}
             
             {/* Text content - wraps around image if present */}
-            <div className="flex-1 whitespace-pre-wrap">
-              {chat.text}
-            </div>
+            {chat.text ? (
+              <div className="flex-1 whitespace-pre-wrap">
+                {chat.text}
+              </div>
+            ) : chat.imageOnly ? (
+              <div className="mt-2 text-sm text-[var(--text-muted)] italic">
+                Image entry
+              </div>
+            ) : null}
           </motion.div>
         </motion.div>
       </motion.div>
