@@ -45,6 +45,10 @@ function parseJsonArray(text: string, expectedLength: number): unknown[] {
   let results = JSON.parse(jsonText) as unknown[];
   if (Array.isArray(results) && results.length === expectedLength) return results;
 
+  if (!Array.isArray(results) && expectedLength === 1) {
+    return [results];
+  }
+
   // Attempt to salvage individual JSON objects
   const objectMatches = [...text.matchAll(/\{[^{}]*"rating"\s*:\s*\d+[^{}]*\}/g)];
   if (objectMatches.length === expectedLength) {
@@ -64,25 +68,29 @@ function buildPrompt(entries: BatchEntry[]): string {
     .map((e, idx) => `Entry ${idx + 1} (${e.date}):\n${e.text}`)
     .join("\n\n---\n\n");
 
-  return `Analyze each of the following journal entries. For each entry, consider its mood, content, and theme to produce a general rating out of 100 (where 1 is extremely negative and 100 is extremely positive).
+  return `You are a witty, slightly sarcastic, but deeply insightful life coach analyzing journal entries. Your vibe is conversational, funny, and punchy—think "cool best friend who keeps it real." 
 
-For each entry, first write a paragraph of your thoughts about what you found noteworthy in the text and how it informed the rating you will give. Then write a single sentence summarizing why you gave that score. Then give the score.
+For each entry, analyze the mood and content. Rate it 1-100 (1: total disaster, 100: pure euphoria).
 
-Respond with a JSON array of exactly ${entries.length} objects, one for each entry in order:
+Rules:
+1. "description": A single, witty, punchy sentence (max 15 words) that captures the "vibe" of why you gave this score. Avoid formal labels; use creative analogies or "keeps-it-real" observations.
+2. "geminiRationale": A short, conversational paragraph (max 3 sentences). Talk directly to the user like a friend. Be insightful but stay funny/lighthearted.
+3. "score": Raw sentiment intensity (-15 to +15).
+
+Respond with a JSON array of exactly ${entries.length} objects:
 {
-  "rating": <integer 1-100>,
+  "rating": <int>,
   "mood": "<positive|negative|neutral>",
-  "description": "<a single sentence explaining why you gave this score, e.g. 'User debated whether umbrellas were real meaning they are quite confused thus very low score'>",
-  "emoji": "<single most appropriate emoji>",
-  "geminiRationale": "<a paragraph of your thoughts about what you found noteworthy in this text and how it informed the rating>",
-  "score": <number -15 to +15, raw sentiment intensity>
+  "description": "<witty punchline>",
+  "emoji": "<perfect emoji>",
+  "geminiRationale": "<short witty talk>",
+  "score": <number>
 }
 
 ENTRIES:
-
 ${entriesText}
 
-Respond ONLY with the JSON array, no other text.`;
+Respond ONLY with the JSON array.`;
 }
 
 function mapResults(

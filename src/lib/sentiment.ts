@@ -17,7 +17,7 @@ export type MoodAnalysis = {
 
 export function analyzeMood(text: string): Mood {
   const result = sentiment.analyze(text);
-  
+
   // Score ranges from -infinity to +infinity
   // Typically -5 to 5 for normal text
   if (result.score > 1) {
@@ -29,92 +29,56 @@ export function analyzeMood(text: string): Mood {
 }
 
 function getMoodDescription(rating: number, mood: Mood): string {
-  // More sophisticated mood descriptions based on rating
   if (mood === 'positive') {
-    if (rating >= 95) return 'ecstatic and overjoyed';
-    if (rating >= 90) return 'absolutely thrilled';
-    if (rating >= 85) return 'feeling blessed and grateful';
-    if (rating >= 80) return 'genuinely happy';
-    if (rating >= 75) return 'optimistic and hopeful';
-    if (rating >= 70) return 'content and satisfied';
-    if (rating >= 65) return 'pleasantly upbeat';
-    if (rating >= 60) return 'mildly positive';
-    if (rating >= 55) return 'slightly cheerful';
-    return 'calm and peaceful';
+    if (rating >= 95) return 'straight up vibing';
+    if (rating >= 90) return 'on cloud nine';
+    if (rating >= 85) return 'feeling blessed';
+    if (rating >= 80) return 'genuinely winning';
+    if (rating >= 75) return 'optimistic as hell';
+    if (rating >= 70) return 'solid content';
+    if (rating >= 65) return 'pretty chill';
+    if (rating >= 60) return 'lowkey happy';
+    if (rating >= 55) return 'not bad at all';
+    return 'peaceful energy';
   } else if (mood === 'negative') {
-    if (rating <= 5) return 'devastated and heartbroken';
-    if (rating <= 10) return 'deeply depressed';
-    if (rating <= 15) return 'severely distressed';
-    if (rating <= 20) return 'overwhelmed with sadness';
-    if (rating <= 25) return 'emotionally drained';
-    if (rating <= 30) return 'quite disappointed';
-    if (rating <= 35) return 'frustrated and irritated';
-    if (rating <= 40) return 'stressed out';
-    if (rating <= 45) return 'somewhat anxious';
-    return 'a bit down';
+    if (rating <= 5) return 'actually devastated';
+    if (rating <= 10) return 'deep in the feels';
+    if (rating <= 15) return 'rough day alert';
+    if (rating <= 20) return 'heavy heart vibes';
+    if (rating <= 25) return 'drained and done';
+    if (rating <= 30) return 'pretty bummed';
+    if (rating <= 35) return 'majorly annoyed';
+    if (rating <= 40) return 'stressing big time';
+    if (rating <= 45) return 'anxiety is talkative';
+    return 'mood is... off';
   } else {
-    // neutral - more nuanced descriptions
-    if (rating >= 55) return 'balanced and steady';
-    if (rating >= 52) return 'reflective and thoughtful';
-    if (rating >= 50) return 'neutral and composed';
-    if (rating >= 48) return 'contemplative';
-    return 'quietly observant';
+    // neutral
+    if (rating >= 55) return 'steady and ready';
+    if (rating >= 52) return 'thinking deep thoughts';
+    if (rating >= 50) return 'cool, calm, collected';
+    if (rating >= 48) return 'just existing';
+    return 'quietly observing';
   }
 }
 
 function generateRationale(rating: number, mood: Mood, score: number, positiveCount: number, negativeCount: number): string {
-  // Generate detailed rationale explaining the rating
   const intensity = Math.abs(score);
-  let rationale = '';
-  
+
   if (mood === 'positive') {
-    rationale = `Positive sentiment detected with ${positiveCount} positive word${positiveCount !== 1 ? 's' : ''}`;
-    if (negativeCount > 0) {
-      rationale += ` and ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}`;
-    }
-    rationale += `. `;
-    
-    if (rating >= 90) {
-      rationale += `Strong positive language and enthusiastic tone indicate exceptionally high mood.`;
-    } else if (rating >= 75) {
-      rationale += `Clear positive indicators show a notably uplifted emotional state.`;
-    } else if (rating >= 60) {
-      rationale += `Moderately positive expressions suggest an optimistic outlook.`;
-    } else {
-      rationale += `Subtle positive undertones suggest a calm, peaceful state.`;
-    }
+    if (rating >= 90) return `Your words are basically radiating light right now. Such a massive win.`;
+    if (rating >= 75) return `Definitely a good vibe. You sound like you're in a great head space.`;
+    if (rating >= 60) return `Solidly positive. Not shouting from the rooftops, but living the good life.`;
+    return `Quietly content. It's the small wins that count, honestly.`;
   } else if (mood === 'negative') {
-    rationale = `Negative sentiment detected with ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}`;
-    if (positiveCount > 0) {
-      rationale += ` and ${positiveCount} positive word${positiveCount !== 1 ? 's' : ''}`;
-    }
-    rationale += `. `;
-    
-    if (rating <= 10) {
-      rationale += `Intense negative language indicates severe emotional distress.`;
-    } else if (rating <= 25) {
-      rationale += `Strong negative expressions show significant emotional burden.`;
-    } else if (rating <= 40) {
-      rationale += `Moderate negative sentiment suggests stress or disappointment.`;
-    } else {
-      rationale += `Mild negative undertones indicate slight discomfort or concern.`;
-    }
+    if (rating <= 10) return `Oof, this one hurt to read. Rooting for you to bounce back from this.`;
+    if (rating <= 25) return `You're carrying a lot right now. Give yourself some grace, you need it.`;
+    if (rating <= 40) return `Things feel a bit heavy. Maybe take a breather? You've got this.`;
+    return `Slightly tilted, but you're still standing. We've all been there.`;
   } else {
-    rationale = `Balanced sentiment with ${positiveCount} positive and ${negativeCount} negative word${negativeCount !== 1 ? 's' : ''}. `;
-    
-    if (rating >= 52) {
-      rationale += `Neutral language with slightly positive lean suggests steady emotional state.`;
-    } else if (rating >= 48) {
-      rationale += `Neutral tone indicates a reflective or contemplative mood.`;
-    } else {
-      rationale += `Balanced expression suggests calm observation without strong emotion.`;
-    }
+    if (rating >= 52) return `Pretty balanced, maybe a tiny bit on the sunny side. Keeping it steady.`;
+    if (rating >= 48) return `Classic neutral. Just taking things as they come without the drama.`;
+    return `A bit quiet, maybe a lot on your mind. Just being a chill observer today.`;
   }
-  
-  // Add score context
-  rationale += ` (Sentiment score: ${score > 0 ? '+' : ''}${score.toFixed(1)})`;
-  
-  return rationale;
 }
 
 export function analyzeMoodDetailed(text: string): MoodAnalysis {
@@ -122,13 +86,13 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
   const score = result.score;
   const positiveCount = result.positive?.length ?? 0;
   const negativeCount = result.negative?.length ?? 0;
-  
+
   // Improved normalization with better distribution
   // The sentiment library typically produces scores from -10 to +10 for normal text,
   // but can go higher for very emotionally charged content. We clamp to -15/+15
   // to handle extreme cases while maintaining good distribution across the 1-100 scale.
   const clampedScore = Math.max(-15, Math.min(15, score));
-  
+
   // More sophisticated mapping for better accuracy
   // Use non-linear scaling to give more granularity in the middle ranges
   let rating: number;
@@ -139,12 +103,12 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
     // Negative: map -15-0 to 1-50 with emphasis on lower scores  
     rating = 50 + (clampedScore / 15) * 49;
   }
-  
+
   rating = Math.round(Math.max(1, Math.min(100, rating)));
-  
+
   let mood: Mood;
   let emoji: string;
-  
+
   // Adjusted thresholds for more accurate mood detection
   if (score > 2) {
     mood = 'positive';
@@ -156,10 +120,10 @@ export function analyzeMoodDetailed(text: string): MoodAnalysis {
     mood = 'neutral';
     emoji = rating >= 52 ? '😐' : rating >= 48 ? '🤔' : '😶';
   }
-  
+
   const description = getMoodDescription(rating, mood);
   const rationale = generateRationale(rating, mood, score, positiveCount, negativeCount);
-  
+
   return {
     mood,
     rating,

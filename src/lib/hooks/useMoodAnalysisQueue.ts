@@ -60,6 +60,7 @@ export function useMoodAnalysisQueue(uid: string | null, userEmail: string | nul
   const processingRef = useRef(false);
   const abortRef = useRef(false);
   const consecutiveFailsRef = useRef(0);
+  const pendingEntriesRef = useRef<PendingEntry[]>([]);
 
   // Count pending entries that need mood analysis
   useEffect(() => {
@@ -68,21 +69,31 @@ export function useMoodAnalysisQueue(uid: string | null, userEmail: string | nul
     const unsubscribe = onSnapshot(
       collection(db, "users", uid, "chats"),
       (snapshot) => {
-        let pendingCount = 0;
         const pendingList: PendingDisplayEntry[] = [];
+        const fullPendingList: PendingEntry[] = [];
+
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
           if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
-            pendingCount++;
-            pendingList.push({
+            const entry = {
               id: doc.id,
               text: String(data.text),
               date: data.dayKey || "",
-            });
+            };
+            pendingList.push(entry);
+            fullPendingList.push(entry);
           }
         });
 
+        const pendingCount = pendingList.length;
+
+        // If pending count increased, reset consecutive fails to allow auto-restart
+        if (pendingCount > status.pending) {
+          consecutiveFailsRef.current = 0;
+        }
+
         setPendingEntries(pendingList);
+        pendingEntriesRef.current = fullPendingList;
 
         setStatus((prev) => {
           if (prev.pending !== pendingCount || prev.total !== pendingCount + prev.processed) {
@@ -94,11 +105,12 @@ export function useMoodAnalysisQueue(uid: string | null, userEmail: string | nul
           }
           return prev;
         });
-      }
+      },
+      (err) => console.error("[Queue Snapshot Error]:", err)
     );
 
     return () => unsubscribe();
-  }, [uid, enabled]);
+  }, [uid, enabled, status.pending]);
 
   const processBatch = useCallback(async (entries: PendingEntry[]): Promise<number> => {
     if (!uid) return 0;
@@ -193,21 +205,14 @@ export function useMoodAnalysisQueue(uid: string | null, userEmail: string | nul
     setStatus((prev) => ({ ...prev, processing: true }));
 
     try {
-      const q = query(collection(db, "users", uid, "chats"));
-      const snapshot = await getDocs(q);
+      const pending = [...pendingEntriesRef.current];
+      if (pending.length === 0) {
+        processingRef.current = false;
+        setStatus((prev) => ({ ...prev, processing: false }));
+        return;
+      }
 
-      const pending: PendingEntry[] = [];
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
-          pending.push({
-            id: doc.id,
-            text: String(data.text),
-            date: data.dayKey || new Date(data.createdAtLocal || data.createdAt).toISOString().split('T')[0],
-          });
-        }
-      });
-
+      console.log(`[Queue] Starting process for ${pending.length} entries...`);
       setStatus((prev) => ({ ...prev, total: pending.length, processed: 0, errors: 0 }));
 
       // Partition into chunks
