@@ -38,7 +38,7 @@ type QueueStatus = {
 };
 
 const BATCH_SIZE = 5; // Smaller batches return faster and distribute work better across AI buckets
-const MAX_CONCURRENCY = 8; // Process up to 8 batches in parallel
+const MAX_CONCURRENCY = 12; // Process up to 12 batches in parallel (utilizing the 30-key cluster)
 const MAX_CONSECUTIVE_FAILS = 3;
 const FETCH_TIMEOUT_MS = 60_000; // 60 seconds is plenty for 5 entries
 

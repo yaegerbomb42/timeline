@@ -5,13 +5,14 @@ import { GEMINI_MODEL } from "./config";
  * Advanced Swarm Worker representing an individual API key (Bucket).
  */
 interface Worker {
-  id: string; // Unique ID (provider:index)
+  id: string;
   provider: ProviderName;
   model: string;
   baseURL: string;
   apiKey: string;
   isBusy: boolean;
   cooldownUntil: number;
+  currentCooldownMultiplier: number; // For dynamic backoff
 }
 
 export type ProviderName =
@@ -114,11 +115,15 @@ export class SwarmEngine {
           apiKey: key,
           isBusy: false,
           cooldownUntil: 0,
+          currentCooldownMultiplier: 1,
         });
       });
     }
 
-    console.log(`[SwarmEngine] Initialized with ${this.workers.length} workers across ${configs.length} providers.`);
+    console.log(`[SwarmEngine] Cluster Mobilized: ${this.workers.length} workers across ${configs.length} providers.`);
+    console.log(`[SwarmEngine] Distributions: ` +
+      configs.map(c => `${c.name}: ${this.workers.filter(w => w.provider === c.name).length}`).join(', ')
+    );
   }
 
   /**
@@ -174,12 +179,22 @@ export class SwarmEngine {
       const text = response.choices[0]?.message?.content?.trim();
       if (!text) throw new Error(`Empty response from ${worker.provider}`);
 
+      // Reset multiplier on success
+      worker.currentCooldownMultiplier = 1;
       return { text, provider: worker.provider };
+    } catch (error: any) {
+      if (error?.status === 429 || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+        // Dynamic Backoff: double the base cooldown for this specific worker
+        worker.currentCooldownMultiplier = Math.min(worker.currentCooldownMultiplier * 2, 8);
+        console.warn(`[SwarmEngine] Worker ${worker.id} saturated. Increasing cooldown multiplier to ${worker.currentCooldownMultiplier}x`);
+      }
+      throw error;
     } finally {
       // Apply cooldown before releasing bucket
-      const cooldown = COOLDOWNS[worker.provider] || COOLDOWNS.default;
+      const baseCooldown = COOLDOWNS[worker.provider] || COOLDOWNS.default;
+      const finalCooldown = baseCooldown * worker.currentCooldownMultiplier;
       worker.isBusy = false;
-      worker.cooldownUntil = Date.now() + cooldown;
+      worker.cooldownUntil = Date.now() + finalCooldown;
     }
   }
 }
