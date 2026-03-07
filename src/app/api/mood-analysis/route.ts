@@ -132,7 +132,10 @@ export async function POST(req: Request) {
   const swarm = SwarmEngine.getInstance();
   const diagnostics = swarm.getDiagnosticInfo();
 
-  if (hasProviders()) {
+  const userEmail = req.headers.get("x-user-email");
+  const isOwner = userEmail === process.env.OWNER_EMAIL;
+
+  if (hasProviders() && isOwner) {
     try {
       const { text, provider } = await runSwarm(prompt, {
         temperature: 0.3,

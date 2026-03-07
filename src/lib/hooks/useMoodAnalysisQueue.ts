@@ -46,7 +46,7 @@ const FETCH_TIMEOUT_MS = 60_000; // 60 seconds is plenty for 5 entries
  * Hook to manage background mood analysis queue
  * Optimized for high-concurrency parallel processing across multiple AI buckets
  */
-export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, enabled: boolean = true) {
+export function useMoodAnalysisQueue(uid: string | null, userEmail: string | null, apiKey: string | null, enabled: boolean = true) {
   const [status, setStatus] = useState<QueueStatus>({
     pending: 0,
     processing: false,
@@ -106,6 +106,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (apiKey) headers["x-timeline-ai-key"] = apiKey;
+      if (userEmail) headers["x-user-email"] = userEmail;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -182,7 +183,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       console.error("Batch processing error:", error);
       return 0;
     }
-  }, [uid, apiKey]);
+  }, [uid, apiKey, userEmail]);
 
   const processQueue = useCallback(async () => {
     if (!uid || !enabled || processingRef.current) return;

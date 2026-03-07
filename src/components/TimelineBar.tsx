@@ -2,7 +2,7 @@
 
 import { format, parse, isAfter, isBefore, startOfDay, addDays } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Sparkles, Calendar } from "lucide-react";
+import { CalendarDays, Sparkles, Calendar, ArrowRightLeft, MousePointer2, ArrowDown01 } from "lucide-react";
 import { useMemo, memo, useState, useRef, useCallback, useEffect } from "react";
 
 import type { Chat } from "@/lib/chats";
@@ -488,9 +488,10 @@ export function TimelineBar({
   const scrollStartRef = useRef(0);
 
   // Selection/Zoom state
-  const [isSelecting, setIsSelecting] = useState(false);
+  const [zoomMode, setZoomMode] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const allDays = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -596,10 +597,33 @@ export function TimelineBar({
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left + container.scrollLeft;
 
-    if (e.shiftKey) {
-      setIsSelecting(true);
-      setSelectionStart(x);
-      setSelectionEnd(x);
+    if (zoomMode) {
+      if (selectionStart === null) {
+        // First click: Set start point
+        setSelectionStart(x);
+        setSelectionEnd(x);
+      } else {
+        // Second click: Finalize zoom
+        const startX = Math.min(selectionStart, x);
+        const endX = Math.max(selectionStart, x);
+
+        if (Math.abs(startX - endX) > 10) {
+          const startIndex = Math.max(0, Math.floor(startX / slotWidth));
+          const endIndex = Math.min(days.length - 1, Math.floor(endX / slotWidth));
+
+          const startDay = days[startIndex];
+          const endDay = days[endIndex];
+
+          if (startDay && endDay) {
+            setStartDate(startDay.dayKey);
+            setEndDate(endDay.dayKey);
+          }
+        }
+        // Reset zoom mode after selection
+        setSelectionStart(null);
+        setSelectionEnd(null);
+        setZoomMode(false);
+      }
     } else {
       isDraggingRef.current = true;
       dragStartXRef.current = e.clientX;
@@ -607,7 +631,7 @@ export function TimelineBar({
       container.style.cursor = 'grabbing';
     }
     e.preventDefault();
-  }, []);
+  }, [zoomMode, selectionStart, slotWidth, days, setStartDate, setEndDate]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-date-segment]')) return;
@@ -623,12 +647,16 @@ export function TimelineBar({
       const container = scrollContainerRef.current;
       if (!container) return;
 
-      if (isSelecting) {
+      if (zoomMode && selectionStart !== null) {
         const rect = container.getBoundingClientRect();
         const x = e.clientX - rect.left + container.scrollLeft;
         setSelectionEnd(x);
         return;
       }
+
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left + container.scrollLeft;
+      setHoverIndex(Math.floor(x / slotWidth));
 
       if (!isDraggingRef.current) return;
       const dx = e.clientX - dragStartXRef.current;
@@ -644,33 +672,9 @@ export function TimelineBar({
     };
 
     const handleEnd = () => {
-      if (isSelecting && selectionStart !== null && selectionEnd !== null) {
-        // Calculate zoom range
-        const startX = Math.min(selectionStart, selectionEnd);
-        const endX = Math.max(selectionStart, selectionEnd);
-
-        // Only zoom if there's a significant drag
-        if (Math.abs(startX - endX) > 10) {
-          const startIndex = Math.max(0, Math.floor(startX / slotWidth));
-          const endIndex = Math.min(days.length - 1, Math.floor(endX / slotWidth));
-
-          const startDay = days[startIndex];
-          const endDay = days[endIndex];
-
-          if (startDay && endDay) {
-            setStartDate(startDay.dayKey);
-            setEndDate(endDay.dayKey);
-          }
-        }
-      }
-
       isDraggingRef.current = false;
-      setIsSelecting(false);
-      setSelectionStart(null);
-      setSelectionEnd(null);
-
       if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.cursor = 'grab';
+        scrollContainerRef.current.style.cursor = zoomMode ? 'crosshair' : 'grab';
       }
     };
     window.addEventListener('mousemove', handleMouseMove);
@@ -724,10 +728,9 @@ export function TimelineBar({
               value={startDate}
               onChange={setStartDate}
               min={minDateStr}
-              max={endDate || maxDateStr}
             />
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 border-l border-[var(--line)] pl-2">
             <label className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-sans">To</label>
             <SwipeableDateInput
               value={endDate}
@@ -736,16 +739,36 @@ export function TimelineBar({
               max={maxDateStr}
             />
           </div>
-          {(startDate || endDate) && (
+          <div className="flex items-center gap-2 border-l border-[var(--line)] pl-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => { setStartDate(""); setEndDate(""); }}
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/60 px-2 py-1 text-[10px] font-sans text-[var(--neon-cyan)] hover:border-[var(--neon-cyan)] transition-all"
+              onClick={() => {
+                setZoomMode(!zoomMode);
+                setSelectionStart(null);
+                setSelectionEnd(null);
+              }}
+              className={cn(
+                "rounded-lg border px-3 py-1 text-[10px] font-sans transition-all flex items-center gap-1.5",
+                zoomMode
+                  ? "border-[var(--neon-purple)] bg-[var(--neon-purple)]/20 text-[var(--neon-purple)] shadow-[0_0_15px_rgba(131,56,236,0.3)]"
+                  : "border-[var(--line)] bg-[var(--bg-surface)]/60 text-[var(--text-secondary)] hover:border-[var(--neon-purple)]"
+              )}
             >
-              Reset
+              <ArrowDown01 className="h-3 w-3" />
+              {zoomMode ? "Cancel Zoom" : "Click to Zoom"}
             </motion.button>
-          )}
+            {(startDate || endDate) && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { setStartDate(""); setEndDate(""); }}
+                className="rounded-lg border border-[var(--line)] bg-[var(--bg-surface)]/60 px-3 py-1 text-[10px] font-sans text-[var(--neon-cyan)] hover:border-[var(--neon-cyan)] transition-all"
+              >
+                Reset View
+              </motion.button>
+            )}
+          </div>
         </div>
 
         <motion.div
@@ -784,10 +807,11 @@ export function TimelineBar({
             width: '100%',
             scrollbarWidth: "thin",
             scrollbarColor: "var(--neon-cyan) var(--bg-surface)",
-            cursor: 'grab',
+            cursor: zoomMode ? 'crosshair' : 'grab',
             outline: 'none',
           }}
           onMouseDown={handleMouseDown}
+          onMouseLeave={() => setHoverIndex(null)}
           onTouchStart={handleTouchStart}
         >
           <div
@@ -799,21 +823,33 @@ export function TimelineBar({
               transformOrigin: 'top left',
             }}
           >
-            {/* Selection Overlay */}
-            {isSelecting && selectionStart !== null && selectionEnd !== null && (
+            {/* Selection Overlay for Two-Click Zoom */}
+            {zoomMode && selectionStart !== null && (
               <div
-                className="absolute top-0 bottom-0 bg-[var(--neon-cyan)]/20 border-x border-[var(--neon-cyan)] pointer-events-none z-30 flex items-center justify-center overflow-hidden"
+                className="absolute top-0 bottom-0 bg-[var(--neon-purple)]/20 border-x border-[var(--neon-purple)] pointer-events-none z-30 flex items-center justify-center overflow-hidden"
                 style={{
-                  left: Math.min(selectionStart, selectionEnd),
-                  width: Math.abs(selectionStart - selectionEnd),
-                  boxShadow: "0 0 30px var(--glow-cyan)",
+                  left: Math.min(selectionStart, selectionEnd ?? selectionStart),
+                  width: Math.abs((selectionEnd ?? selectionStart) - selectionStart),
+                  boxShadow: "0 0 30px var(--glow-purple)",
                   backdropFilter: "blur(4px)",
                 }}
               >
-                <div className="text-[10px] uppercase tracking-widest text-[var(--neon-cyan)] font-bold animate-pulse">
-                  Release to Zoom
+                <div className="px-3 py-1.5 rounded-full bg-[var(--neon-purple)]/80 text-[10px] text-white font-bold tracking-widest uppercase flex items-center gap-2">
+                  <MousePointer2 className="h-3.5 w-3.5 animate-pulse" />
+                  {selectionEnd === selectionStart ? "Click end point" : "Finalize Zoom"}
                 </div>
               </div>
+            )}
+
+            {/* Hover Highlighting during Zoom Mode */}
+            {zoomMode && selectionStart === null && hoverIndex !== null && (
+              <div
+                className="absolute top-0 bottom-0 bg-[var(--neon-purple)]/5 pointer-events-none z-20 border-x border-[var(--neon-purple)]/20"
+                style={{
+                  left: hoverIndex * slotWidth,
+                  width: slotWidth,
+                }}
+              />
             )}
             {/* Roller coaster path connecting the dots */}
             <svg
@@ -1158,6 +1194,6 @@ export function TimelineBar({
         onClose={() => setShowRationaleModal(false)}
         chat={selectedChat}
       />
-    </div>
+    </div >
   );
 }

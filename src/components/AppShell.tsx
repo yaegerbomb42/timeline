@@ -24,16 +24,16 @@ import { useAiKey } from "@/lib/ai/useAiKey";
 import { cn } from "@/lib/utils";
 
 // Parallax header with depth
-function ParallaxHeader({ 
-  scrollY, 
-  user, 
-  signOut, 
+function ParallaxHeader({
+  scrollY,
+  user,
+  signOut,
   isGuest,
   isAdmin,
   onAdminAccess,
-}: { 
-  scrollY: MotionValue<number>; 
-  user: User | null; 
+}: {
+  scrollY: MotionValue<number>;
+  user: User | null;
   signOut: () => void;
   isGuest: boolean;
   isAdmin: boolean;
@@ -148,119 +148,125 @@ function AdminPanel({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20, y: -20 }}
-      animate={{ opacity: 1, x: 0, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.6 }}
-      className="fixed top-6 left-6 z-40 flex flex-col gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl p-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-      style={{
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.1) inset",
-      }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.6 }}
+      className="w-full flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg-elevated)]/40 backdrop-blur-xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.3)] mb-6"
     >
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onBatchImport}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-          "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
-          "hover:border-[var(--neon-cyan)]"
-        )}
-      >
-        <Upload className="h-3.5 w-3.5" />
-        Batch Import
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onBulkDelete}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-          "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(255,0,110,0.4)]",
-          "hover:border-[var(--neon-pink)]"
-        )}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-        Bulk Delete
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onUndoBatch}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-          "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
-          "hover:border-[var(--neon-purple)]"
-        )}
-      >
-        <Undo2 className="h-3.5 w-3.5" />
-        Undo Batch
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onViewArchive}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-          "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
-          "hover:border-[var(--neon-purple)]"
-        )}
-      >
-        <Archive className="h-3.5 w-3.5" />
-        Archive
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onRecalculateMoods}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-          "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
-          "hover:border-[var(--neon-cyan)]"
-        )}
-      >
-        <Sparkles className="h-3.5 w-3.5" />
-        Sync Moods
-      </motion.button>
-      
+      <div className="flex items-center gap-2 mr-4 border-r border-[var(--line)] pr-4">
+        <div className="h-8 w-8 rounded-lg bg-[var(--neon-cyan)]/20 flex items-center justify-center">
+          <Zap className="h-4 w-4 text-[var(--neon-cyan)]" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-bold">Admin Console</div>
+          <div className="text-xs text-[var(--text-primary)] font-semibold">System Controls</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 flex-1">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onBatchImport}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+            "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+            "hover:border-[var(--neon-cyan)]"
+          )}
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Batch Import
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onBulkDelete}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+            "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(255,0,110,0.4)]",
+            "hover:border-[var(--neon-pink)]"
+          )}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Bulk Delete
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onUndoBatch}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+            "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
+            "hover:border-[var(--neon-purple)]"
+          )}
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          Undo Batch
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onViewArchive}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+            "font-sans text-xs text-[var(--neon-purple)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(131,56,236,0.4)]",
+            "hover:border-[var(--neon-purple)]"
+          )}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          Archive
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onRecalculateMoods}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
+            "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
+            "hover:border-[var(--neon-cyan)]"
+          )}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Sync Moods
+        </motion.button>
+      </div>
+
       {/* Mood Queue Status & Controls */}
       {queueStatus && queueStatus.pending > 0 && (
-        <div className="mt-2 pt-2 border-t border-[var(--line)]">
-          <div className="text-[10px] text-[var(--text-secondary)] mb-2 px-1">
-            AI Mood Queue: {queueStatus.pending} pending
+        <div className="flex items-center gap-3 ml-auto pl-4 border-l border-[var(--line)]">
+          <div className="text-[10px] text-[var(--text-secondary)] whitespace-nowrap">
+            <span className="text-[var(--neon-cyan)] font-bold">{queueStatus.pending}</span> PENDING
           </div>
           {queueStatus.processing ? (
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={onStopQueue}
               className={cn(
-                "w-full inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-                "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
+                "inline-flex items-center gap-2 rounded-xl border border-[var(--neon-pink)]/30 bg-[var(--neon-pink)]/10 px-4 py-2",
+                "font-sans text-xs text-[var(--neon-pink)] hover:bg-[var(--neon-pink)]/20 transition-all duration-200"
               )}
             >
               <Zap className="h-3.5 w-3.5 animate-pulse" />
-              Processing... ({queueStatus.processed}/{queueStatus.total})
+              Processing ({queueStatus.processed}/{queueStatus.total})
             </motion.button>
           ) : (
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={onStartQueue}
               className={cn(
-                "w-full inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg-elevated)]/60 backdrop-blur-xl px-3 py-2",
-                "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--bg-elevated)] transition-all duration-200",
-                "shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,245,255,0.4)]",
-                "hover:border-[var(--neon-cyan)]"
+                "inline-flex items-center gap-2 rounded-xl border border-[var(--neon-cyan)]/30 bg-[var(--neon-cyan)]/10 px-4 py-2",
+                "font-sans text-xs text-[var(--neon-cyan)] hover:bg-[var(--neon-cyan)]/20 transition-all duration-200"
               )}
             >
               <Zap className="h-3.5 w-3.5" />
-              Start AI Analysis
+              Mobilize Swarm
             </motion.button>
           )}
         </div>
@@ -497,6 +503,7 @@ export function AppShell() {
   const { aiKey, hydrated: aiKeyHydrated, hasKey, setAiKey } = useAiKey(user?.uid ?? null);
   const { status: queueStatus, recentResults, pendingEntries, startQueue, stopQueue } = useMoodAnalysisQueue(
     user?.uid ?? null,
+    user?.email ?? null,
     aiKey || null,
     aiKeyHydrated
   );
@@ -515,14 +522,14 @@ export function AppShell() {
   const [flight, setFlight] = useState<
     | null
     | {
-        id: number;
-        startX: number;
-        startY: number;
-        midX: number;
-        midY: number;
-        endX: number;
-        endY: number;
-      }
+      id: number;
+      startX: number;
+      startY: number;
+      midX: number;
+      midY: number;
+      endX: number;
+      endY: number;
+    }
   >(null);
   const timelineCardRef = useRef<HTMLElement | null>(null);
   const stats = useEngagementStats(user?.email ?? user?.uid ?? null);
@@ -562,13 +569,15 @@ export function AppShell() {
       }
       return s;
     })();
-    return { totalEntries, totalDays, streakDays: streak, engagement: stats.pretty, avgMoodRating: (() => {
-      const ratings = chats
-        .filter(c => !c.imageOnly && c.moodAnalysis?.rating != null)
-        .map(c => c.moodAnalysis!.rating);
-      if (ratings.length === 0) return 0;
-      return Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length);
-    })() };
+    return {
+      totalEntries, totalDays, streakDays: streak, engagement: stats.pretty, avgMoodRating: (() => {
+        const ratings = chats
+          .filter(c => !c.imageOnly && c.moodAnalysis?.rating != null)
+          .map(c => c.moodAnalysis!.rating);
+        if (ratings.length === 0) return 0;
+        return Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length);
+      })()
+    };
   }, [chats, stats.pretty]);
 
   if (authLoading) {
@@ -596,7 +605,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen px-6 py-10 relative overflow-hidden">
       {/* Background removed - no floating particles */}
-      
+
       {/* Batch Import Modal */}
       <AnimatePresence>
         {showBatchImport && user?.uid && (
@@ -641,7 +650,7 @@ export function AppShell() {
           />
         )}
       </AnimatePresence>
-      
+
       <AnimatePresence>
         {flight ? (
           <motion.div
@@ -696,39 +705,7 @@ export function AppShell() {
         ) : null}
       </AnimatePresence>
 
-      {/* Admin Panel - Top Left */}
-      {isAdmin && user && (
-        <AdminPanel
-          onBatchImport={() => setShowBatchImport(true)}
-          onBulkDelete={() => setShowBulkDelete(true)}
-          onUndoBatch={() => setShowUndoBatch(true)}
-          onViewArchive={() => setShowArchive(true)}
-          onRecalculateMoods={async () => {
-            if (!user?.uid) return;
-            if (recalculatingMoods) return;
-            
-            const confirmed = window.confirm(
-              "This will reset ALL mood analysis and re-queue every entry for Gemini AI re-evaluation. This may use significant API quota. Continue?"
-            );
-            if (!confirmed) return;
-            
-            setRecalculatingMoods(true);
-            try {
-              const resetCount = await resetAllMoodAnalysis(user.uid, (current, total) => {
-                console.log(`Resetting mood analysis: ${current}/${total}`);
-              });
-              alert(`Reset ${resetCount} entries for Gemini re-evaluation! The AI queue will automatically start processing them.`);
-            } catch (err: any) {
-              alert(`Failed to reset mood analysis: ${err.message}`);
-            } finally {
-              setRecalculatingMoods(false);
-            }
-          }}
-          queueStatus={queueStatus}
-          onStartQueue={startQueue}
-          onStopQueue={stopQueue}
-        />
-      )}
+      {/* Admin Panel and Pasword Modal handled below in main flow */}
 
       {/* Admin Password Modal */}
       <AnimatePresence>
@@ -743,10 +720,10 @@ export function AppShell() {
       </AnimatePresence>
 
       <div className="mx-auto w-full max-w-7xl relative z-10">
-        <ParallaxHeader 
-          scrollY={scrollY} 
-          user={user} 
-          signOut={signOut} 
+        <ParallaxHeader
+          scrollY={scrollY}
+          user={user}
+          signOut={signOut}
           isGuest={isGuest}
           isAdmin={isAdmin}
           onAdminAccess={() => setShowAdminPassword(true)}
@@ -760,6 +737,40 @@ export function AppShell() {
             transition={{ delay: 0.4, duration: 0.8 }}
             className="flex flex-col gap-6 mb-10"
           >
+            {/* Admin Controls - Integrated Sleekly */}
+            {isAdmin && user && (
+              <AdminPanel
+                onBatchImport={() => setShowBatchImport(true)}
+                onBulkDelete={() => setShowBulkDelete(true)}
+                onUndoBatch={() => setShowUndoBatch(true)}
+                onViewArchive={() => setShowArchive(true)}
+                onRecalculateMoods={async () => {
+                  if (!user?.uid) return;
+                  if (recalculatingMoods) return;
+
+                  const confirmed = window.confirm(
+                    "This will reset ALL mood analysis and re-queue every entry for Gemini AI re-evaluation. Continue?"
+                  );
+                  if (!confirmed) return;
+
+                  setRecalculatingMoods(true);
+                  try {
+                    const resetCount = await resetAllMoodAnalysis(user.uid, (current, total) => {
+                      console.log(`Resetting mood analysis: ${current}/${total}`);
+                    });
+                    alert(`Reset ${resetCount} entries!`);
+                  } catch (err: any) {
+                    alert(`Failed: ${err.message}`);
+                  } finally {
+                    setRecalculatingMoods(false);
+                  }
+                }}
+                queueStatus={queueStatus}
+                onStartQueue={startQueue}
+                onStopQueue={stopQueue}
+              />
+            )}
+
             {/* AI Processing Queue - Top */}
             <GeminiQueuePanel status={queueStatus} recentResults={recentResults} pendingEntries={pendingEntries} />
 
