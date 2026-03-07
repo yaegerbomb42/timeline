@@ -158,55 +158,69 @@ export class SwarmEngine {
    */
   public async execute(
     prompt: string,
-    options: { temperature?: number; maxTokens?: number } = {}
+    options: { temperature?: number; maxTokens?: number; maxRetries?: number } = {}
   ): Promise<{ text: string; provider: ProviderName }> {
-    const worker = this.findWorker();
+    const { temperature = 0.3, maxTokens = 8192, maxRetries = 5 } = options;
 
-    if (!worker) {
-      // If no workers available, wait a bit or throw
-      // For simplicity in the API route, we throw so the client can retry or wait.
-      throw new Error("All AI buckets are busy or cooling down. Please wait 5 seconds.");
-    }
+    let lastError: any;
 
-    const { temperature = 0.3, maxTokens = 8192 } = options;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const worker = this.findWorker();
 
-    worker.isBusy = true;
-    try {
-      const client = new OpenAI({
-        baseURL: worker.baseURL,
-        apiKey: worker.apiKey,
-        ...(worker.provider === 'openrouter' ? {
-          defaultHeaders: { "HTTP-Referer": "https://turbotoolbox.me", "X-Title": "Timeline AI" }
-        } : {})
-      });
-
-      const response = await client.chat.completions.create({
-        model: worker.model,
-        messages: [{ role: "user", content: prompt }],
-        temperature,
-        max_tokens: maxTokens,
-      });
-
-      const text = response.choices[0]?.message?.content?.trim();
-      if (!text) throw new Error(`Empty response from ${worker.provider}`);
-
-      // Reset multiplier on success
-      worker.currentCooldownMultiplier = 1;
-      return { text, provider: worker.provider };
-    } catch (error: any) {
-      if (error?.status === 429 || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
-        // Dynamic Backoff: double the base cooldown for this specific worker
-        worker.currentCooldownMultiplier = Math.min(worker.currentCooldownMultiplier * 2, 8);
-        console.warn(`[SwarmEngine] Worker ${worker.id} saturated. Increasing cooldown multiplier to ${worker.currentCooldownMultiplier}x`);
+      if (!worker) {
+        throw new Error("All AI buckets are busy or cooling down. Please wait a moment.");
       }
-      throw error;
-    } finally {
-      // Apply cooldown before releasing bucket
-      const baseCooldown = COOLDOWNS[worker.provider] || COOLDOWNS.default;
-      const finalCooldown = baseCooldown * worker.currentCooldownMultiplier;
-      worker.isBusy = false;
-      worker.cooldownUntil = Date.now() + finalCooldown;
+
+      worker.isBusy = true;
+      try {
+        const client = new OpenAI({
+          baseURL: worker.baseURL,
+          apiKey: worker.apiKey,
+          ...(worker.provider === 'openrouter' ? {
+            defaultHeaders: { "HTTP-Referer": "https://turbotoolbox.me", "X-Title": "Timeline AI" }
+          } : {})
+        });
+
+        const response = await client.chat.completions.create({
+          model: worker.model,
+          messages: [{ role: "user", content: prompt }],
+          temperature,
+          max_tokens: maxTokens,
+        });
+
+        const text = response.choices[0]?.message?.content?.trim();
+        if (!text) throw new Error(`Empty response from ${worker.provider}`);
+
+        // Reset multiplier on success
+        worker.currentCooldownMultiplier = 1;
+
+        // Immediately free up worker
+        const baseCooldown = COOLDOWNS[worker.provider] || COOLDOWNS.default;
+        worker.isBusy = false;
+        worker.cooldownUntil = Date.now() + baseCooldown;
+
+        return { text, provider: worker.provider };
+      } catch (error: any) {
+        lastError = error;
+        const msg = error?.message || String(error);
+        if (error?.status === 429 || msg.includes('quota') || msg.includes('rate limit') || msg.includes('insufficient_quota')) {
+          worker.currentCooldownMultiplier = Math.min(worker.currentCooldownMultiplier * 2, 8);
+          console.warn(`[SwarmEngine] Worker ${worker.id} saturated/out-of-quota. Doubling cooldown (${worker.currentCooldownMultiplier}x)`);
+        } else {
+          worker.currentCooldownMultiplier = Math.min(worker.currentCooldownMultiplier * 1.5, 4);
+          console.warn(`[SwarmEngine] Worker ${worker.id} failed:`, msg);
+        }
+
+        const baseCooldown = COOLDOWNS[worker.provider] || COOLDOWNS.default;
+        const finalCooldown = baseCooldown * worker.currentCooldownMultiplier;
+        worker.isBusy = false;
+        worker.cooldownUntil = Date.now() + finalCooldown;
+
+        // Loop around and try the next available worker immediately
+      }
     }
+
+    throw new Error(`Swarm failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
   }
 }
 
