@@ -42,24 +42,25 @@ const COOLDOWNS: Record<string, number> = {
 /**
  * Robustly fetch keys from environment variables.
  */
+/**
+ * Robustly fetch keys from environment variables.
+ */
 function getEnvKeys(providerName: string): string[] {
   const keys: string[] = [];
-  const prefixes = [`VITE_${providerName.toUpperCase()}_API_KEY`, `${providerName.toUpperCase()}_API_KEY`];
+  const prefix = `${providerName.toUpperCase()}_API_KEY`;
 
-  for (const prefix of prefixes) {
-    const single = process.env[prefix];
-    if (single && !keys.includes(single)) keys.push(single);
+  const single = process.env[prefix];
+  if (single && !keys.includes(single)) keys.push(single);
 
-    for (let i = 1; i <= 20; i++) {
-      const val = process.env[`${prefix}_${i}`];
-      if (val && !keys.includes(val)) keys.push(val);
-    }
+  for (let i = 1; i <= 20; i++) {
+    const val = process.env[`${prefix}_${i}`];
+    if (val && !keys.includes(val)) keys.push(val);
   }
 
   if (providerName === 'openrouter') {
-    const paid = process.env.VITE_OPENROUTER_API_KEY_PAID;
+    const paid = process.env.OPENROUTER_API_KEY_PAID;
     if (paid && !keys.includes(paid)) keys.push(paid);
-    const free = process.env.VITE_OPENROUTER_API_KEY_FREE;
+    const free = process.env.OPENROUTER_API_KEY_FREE;
     if (free && !keys.includes(free)) keys.push(free);
   }
 

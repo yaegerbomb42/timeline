@@ -152,7 +152,7 @@ export async function POST(req: Request) {
   // ── Strategy 2: Legacy Gemini Fallback (Single Key) ───────────────────
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
   const validHeaderKey = headerKey && headerKey !== "null" && headerKey !== "undefined" ? headerKey : null;
-  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY_1;
+  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_1;
 
   if (!apiKey) {
     return NextResponse.json(
