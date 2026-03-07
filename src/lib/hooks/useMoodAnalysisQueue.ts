@@ -38,7 +38,7 @@ type QueueStatus = {
 };
 
 const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
-const RATE_LIMIT_DELAY = 3000; // 3 seconds between batches to avoid rate limits
+const RATE_LIMIT_DELAY = 5000; // 5 seconds between batches to stay under ~15 RPM rate limits
 const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
 const FETCH_TIMEOUT_MS = 90_000; // 90 seconds max for a single API call
 
@@ -56,7 +56,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   });
   const [recentResults, setRecentResults] = useState<QueueLogItem[]>([]);
   const [pendingEntries, setPendingEntries] = useState<PendingDisplayEntry[]>([]);
-  
+
   const processingRef = useRef(false);
   const abortRef = useRef(false);
   const consecutiveFailsRef = useRef(0);
@@ -83,15 +83,15 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
             });
           }
         });
-        
+
         setPendingEntries(pendingList);
-        
+
         // Use callback form to avoid cascading renders
         setStatus((prev) => {
           // Only update if values actually changed
           if (prev.pending !== pendingCount || prev.total !== pendingCount + prev.processed) {
-            return { 
-              ...prev, 
+            return {
+              ...prev,
               pending: pendingCount,
               total: pendingCount + prev.processed,
             };
@@ -139,12 +139,12 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       if (!response.ok) {
         const error = await response.json();
         console.error("Mood analysis API error:", error);
-        
+
         // If rate limited, throw specific error
         if (response.status === 429) {
           throw new Error("RATE_LIMITED");
         }
-        
+
         throw new Error(error.error || "Analysis failed");
       }
 
@@ -168,7 +168,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
             },
           });
           updated++;
-          
+
           // Add to recent results log
           const matchingEntry = entries.find(e => e.id === result.id);
           setRecentResults((prev) => {
@@ -244,15 +244,15 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         }
 
         const batch = pending.slice(i, i + BATCH_SIZE);
-        
+
         try {
           const updated = await processBatch(batch);
-          
+
           if (updated > 0) {
             batchSucceeded = true;
             consecutiveFailsRef.current = 0; // Reset on any success
           }
-          
+
           setStatus((prev) => ({
             ...prev,
             processed: prev.processed + updated,
@@ -274,7 +274,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
           }
         }
       }
-      
+
       if (!batchSucceeded) {
         consecutiveFailsRef.current++;
       }
@@ -284,7 +284,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     } finally {
       processingRef.current = false;
       setStatus((prev) => ({ ...prev, processing: false }));
-      
+
       // After processing completes, check if new entries arrived during processing.
       // If so, the onSnapshot listener will update pending count, which will trigger
       // the auto-start effect to run again after a short delay.

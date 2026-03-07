@@ -1,3 +1,3 @@
-// Using Gemini 3 Flash Preview (2026 Google AI Studio)
-export const GEMINI_MODEL = "gemini-3-flash-preview";
+// Using Gemini 2.5 Flash for higher rate limits
+export const GEMINI_MODEL = "gemini-2.5-flash";
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL } from "@/lib/ai/config";
-import { raceProviders, getProviders } from "@/lib/ai/swarm";
+import { runSwarm, hasProviders } from "@/lib/ai/swarm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,33 +128,32 @@ export async function POST(req: Request) {
 
   const prompt = buildPrompt(body.entries);
 
-  // ── Strategy 1: Swarm – race all fast providers in parallel ───────────
-  const swarmProviders = getProviders();
-  if (swarmProviders.length > 0) {
+  // ── Strategy 1: Enhanced Swarm (10+ Providers, 30+ Keys) ─────────────
+  if (hasProviders()) {
     try {
-      const { text, provider } = await raceProviders(prompt, {
+      const { text, provider } = await runSwarm(prompt, {
         temperature: 0.3,
         maxTokens: 8192,
       });
 
-      console.log(`[Mood Analysis] Swarm winner: ${provider}`);
+      console.log(`[Mood Analysis] Swarm success via: ${provider}`);
 
       const analysisResults = parseJsonArray(text, body.entries.length);
       const results = mapResults(analysisResults, body.entries);
       return NextResponse.json({ results, provider });
     } catch (swarmError) {
-      console.warn("[Mood Analysis] All swarm providers failed, falling back to Gemini:", swarmError);
+      console.warn("[Mood Analysis] Swarm failed, attempting legacy Gemini fallback:", swarmError);
     }
   }
 
-  // ── Strategy 2: Gemini fallback ───────────────────────────────────────
+  // ── Strategy 2: Legacy Gemini Fallback (Single Key) ───────────────────
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
   const validHeaderKey = headerKey && headerKey !== "null" && headerKey !== "undefined" ? headerKey : null;
-  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY;
+  const apiKey = validHeaderKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY_1;
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "No AI providers available (swarm keys and Gemini key all missing)." },
+      { error: "No AI providers available (Swarm and Legacy Fallback both failed)." },
       { status: 400 },
     );
   }
@@ -176,17 +175,11 @@ export async function POST(req: Request) {
     });
 
     if (response.promptFeedback?.blockReason) {
-      return NextResponse.json(
-        { error: "Content blocked by safety filters." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Content blocked by safety filters." }, { status: 400 });
     }
 
     if (!response.candidates || response.candidates.length === 0) {
-      return NextResponse.json(
-        { error: "No response candidates generated." },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: "No response candidates generated." }, { status: 502 });
     }
 
     const text = response.text?.trim() || "";
@@ -197,22 +190,17 @@ export async function POST(req: Request) {
     const analysisResults = parseJsonArray(text, body.entries.length);
     const results = mapResults(analysisResults, body.entries);
 
-    return NextResponse.json({ results, provider: "gemini" });
-  } catch (error: unknown) {
-    console.error("[Mood Analysis Error]:", error);
+    return NextResponse.json({ results, provider: "gemini-legacy-fallback" });
+  } catch (error: any) {
+    console.error("[Mood Analysis Fallback Error]:", error);
 
-    const err = error as { message?: string; code?: string | number; status?: number };
-    const errorMessage = err?.message || String(error);
-
-    if (err?.code === 429 || errorMessage?.includes("quota") || errorMessage?.includes("rate limit")) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
-        { status: 429 },
-      );
+    const errorMessage = error?.message || String(error);
+    if (errorMessage.includes("quota") || errorMessage.includes("rate limit") || error?.status === 429) {
+      return NextResponse.json({ error: "All providers and fallbacks are rate limited." }, { status: 429 });
     }
 
     return NextResponse.json(
-      { error: "Mood analysis failed.", details: errorMessage.slice(0, 500) },
+      { error: "Mood analysis failed across all providers.", details: errorMessage.slice(0, 500) },
       { status: 500 },
     );
   }
