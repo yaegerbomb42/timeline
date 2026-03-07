@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL } from "@/lib/ai/config";
-import { runSwarm, hasProviders } from "@/lib/ai/swarm";
+import { runSwarm, hasProviders, SwarmEngine } from "@/lib/ai/swarm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,6 +129,9 @@ export async function POST(req: Request) {
   const prompt = buildPrompt(body.entries);
 
   // ── Strategy 1: Enhanced Swarm (10+ Providers, 30+ Keys) ─────────────
+  const swarm = SwarmEngine.getInstance();
+  const diagnostics = swarm.getDiagnosticInfo();
+
   if (hasProviders()) {
     try {
       const { text, provider } = await runSwarm(prompt, {
@@ -140,7 +143,7 @@ export async function POST(req: Request) {
 
       const analysisResults = parseJsonArray(text, body.entries.length);
       const results = mapResults(analysisResults, body.entries);
-      return NextResponse.json({ results, provider });
+      return NextResponse.json({ results, provider, diagnostics });
     } catch (swarmError) {
       console.warn("[Mood Analysis] Swarm failed, attempting legacy Gemini fallback:", swarmError);
     }
@@ -196,11 +199,11 @@ export async function POST(req: Request) {
 
     const errorMessage = error?.message || String(error);
     if (errorMessage.includes("quota") || errorMessage.includes("rate limit") || error?.status === 429) {
-      return NextResponse.json({ error: "All providers and fallbacks are rate limited." }, { status: 429 });
+      return NextResponse.json({ error: "All providers and fallbacks are rate limited.", diagnostics }, { status: 429 });
     }
 
     return NextResponse.json(
-      { error: "Mood analysis failed across all providers.", details: errorMessage.slice(0, 500) },
+      { error: "Mood analysis failed across all providers.", details: errorMessage.slice(0, 500), diagnostics },
       { status: 500 },
     );
   }

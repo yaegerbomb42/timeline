@@ -88,6 +88,16 @@ export class SwarmEngine {
     return this.workers.length;
   }
 
+  public getDiagnosticInfo() {
+    return {
+      totalWorkers: this.workers.length,
+      available: this.workers.filter(w => !w.isBusy && w.cooldownUntil <= Date.now()).length,
+      busy: this.workers.filter(w => w.isBusy).length,
+      cooling: this.workers.filter(w => !w.isBusy && w.cooldownUntil > Date.now()).length,
+      providers: [...new Set(this.workers.map(w => w.provider))]
+    };
+  }
+
   /** Initialize workers from environment keys */
   public refreshWorkers() {
     this.workers = [];

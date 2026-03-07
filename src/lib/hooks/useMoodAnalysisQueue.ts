@@ -123,9 +123,12 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       }
 
       if (!response.ok) {
-        if (response.status === 429) throw new Error("RATE_LIMITED");
-        const error = await response.json();
-        throw new Error(error.error || "Analysis failed");
+        const errorData = await response.json();
+        if (response.status === 429) {
+          console.warn("[Mood Analysis Swarm Status]:", errorData.diagnostics);
+          throw new Error("RATE_LIMITED");
+        }
+        throw new Error(errorData.error || "Analysis failed");
       }
 
       const { results } = await response.json();
