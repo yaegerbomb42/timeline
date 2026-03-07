@@ -88,7 +88,7 @@ function interpolateYPosition(
   // Find nearest rated day before
   let beforeDay: DayBucket | null = null;
   let beforeRating: number | null = null;
-  
+
   for (let i = allDays.length - 1; i >= 0; i--) {
     const day = allDays[i]!;
     if (day.date < targetDate) {
@@ -97,7 +97,7 @@ function interpolateYPosition(
         .filter(c => !c.imageOnly)
         .map(c => c.moodAnalysis?.rating)
         .filter((r): r is number => r !== undefined && r !== null);
-      
+
       if (ratings.length > 0) {
         beforeDay = day;
         beforeRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
@@ -105,11 +105,11 @@ function interpolateYPosition(
       }
     }
   }
-  
+
   // Find nearest rated day after
   let afterDay: DayBucket | null = null;
   let afterRating: number | null = null;
-  
+
   for (let i = 0; i < allDays.length; i++) {
     const day = allDays[i]!;
     if (day.date > targetDate) {
@@ -118,7 +118,7 @@ function interpolateYPosition(
         .filter(c => !c.imageOnly)
         .map(c => c.moodAnalysis?.rating)
         .filter((r): r is number => r !== undefined && r !== null);
-      
+
       if (ratings.length > 0) {
         afterDay = day;
         afterRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
@@ -126,27 +126,27 @@ function interpolateYPosition(
       }
     }
   }
-  
+
   // If we have both before and after, interpolate
   if (beforeDay && afterDay && beforeRating !== null && afterRating !== null) {
     const totalMs = afterDay.date.getTime() - beforeDay.date.getTime();
     const targetMs = targetDate.getTime() - beforeDay.date.getTime();
     const ratio = totalMs > 0 ? targetMs / totalMs : 0.5;
-    
+
     const interpolatedRating = beforeRating + (afterRating - beforeRating) * ratio;
     return ratingToY(interpolatedRating);
   }
-  
+
   // If we only have before, use that rating
   if (beforeRating !== null) {
     return ratingToY(beforeRating);
   }
-  
+
   // If we only have after, use that rating
   if (afterRating !== null) {
     return ratingToY(afterRating);
   }
-  
+
   // Default to neutral if no rated entries exist
   return ratingToY(50);
 }
@@ -174,10 +174,10 @@ const GlowingDot = memo(function GlowingDot({
   const moodColor = ratingToColor(displayRating);
   // Parse the rgb color to create an rgba version for glow effects
   const rgbMatch = moodColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  const moodColorRgba = rgbMatch 
+  const moodColorRgba = rgbMatch
     ? `rgba(${rgbMatch[1]},${rgbMatch[2]},${rgbMatch[3]},0.6)`
     : 'rgba(0,245,255,0.6)';
-  
+
   const handleClick = () => {
     if (onClick) {
       onClick();
@@ -190,7 +190,7 @@ const GlowingDot = memo(function GlowingDot({
       onShowRationale();
     }
   };
-  
+
   return (
     <div className="relative group/dot">
       <motion.button
@@ -206,11 +206,11 @@ const GlowingDot = memo(function GlowingDot({
           y: yOffset,
           boxShadow: isHighlighted
             ? [
-                `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
-                `0 0 0 18px ${moodColorRgba}`,
-                `0 0 0 10px ${moodColorRgba.replace('0.6', '0.4')}`,
-                `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
-              ]
+              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
+              `0 0 0 18px ${moodColorRgba}`,
+              `0 0 0 10px ${moodColorRgba.replace('0.6', '0.4')}`,
+              `0 0 0 0px ${moodColorRgba.replace('0.6', '0')}`,
+            ]
             : isNewest
               ? `0 0 24px ${moodColorRgba}, 0 0 48px ${moodColorRgba.replace('0.6', '0.4')}`
               : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
@@ -231,23 +231,23 @@ const GlowingDot = memo(function GlowingDot({
           height: size,
           background: `radial-gradient(circle, ${moodColor}, ${moodColor}dd)`,
           borderColor: moodColor,
-          boxShadow: isNewest 
+          boxShadow: isNewest
             ? `0 0 24px ${moodColorRgba}, 0 0 48px ${moodColorRgba.replace('0.6', '0.4')}`
             : `0 0 12px ${moodColorRgba.replace('0.6', '0.4')}`,
         }}
       >
         {/* Rating number inside circle - display only, hidden when node is too small */}
         {size >= 10 && (
-        <span 
-          className="font-bold font-mono select-none pointer-events-none"
-          style={{
-            fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
-            color: 'rgba(255, 255, 255, 0.95)',
-            textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
-          }}
-        >
-          {displayRating}
-        </span>
+          <span
+            className="font-bold font-mono select-none pointer-events-none"
+            style={{
+              fontSize: Math.max(6, size * NODE_FONT_SIZE_RATIO),
+              color: 'rgba(255, 255, 255, 0.95)',
+              textShadow: `0 0 3px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)`,
+            }}
+          >
+            {displayRating}
+          </span>
         )}
         {isNewest && (
           <motion.div
@@ -267,44 +267,44 @@ const GlowingDot = memo(function GlowingDot({
   );
 });
 
-function SwipeableDateInput({ 
-  value, 
-  onChange, 
-  min, 
-  max, 
-}: { 
-  value: string; 
-  onChange: (val: string) => void; 
-  min?: string; 
+function SwipeableDateInput({
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  min?: string;
   max?: string;
 }) {
   const parsed = value ? parse(value, "yyyy-MM-dd", new Date()) : null;
   const month = parsed ? parsed.getMonth() : 0;
   const day = parsed ? parsed.getDate() : 1;
   const year = parsed ? parsed.getFullYear() : new Date().getFullYear();
-  
+
   // Track whether a drag is in progress for visual feedback
   const [isDragging, setIsDragging] = useState(false);
   // Track whether native date input is shown
   const [showNativeInput, setShowNativeInput] = useState(false);
   const nativeInputRef = useRef<HTMLInputElement>(null);
-  
-  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
   // Focus native input when shown
   useEffect(() => {
     if (showNativeInput && nativeInputRef.current) {
       nativeInputRef.current.focus();
     }
   }, [showNativeInput]);
-  
+
   function clampDateStr(d: Date): string {
     const result = format(d, "yyyy-MM-dd");
     if (min && result < min) return min;
     if (max && result > max) return max;
     return result;
   }
-  
+
   // Unified drag handler: dragging anywhere on the date control moves the
   // entire date by days.  Sensitivity is tuned so that a moderate drag
   // (~3 inches / ~288 px) can traverse several years worth of days.
@@ -324,9 +324,9 @@ function SwipeableDateInput({
     const startDate = parsed ?? new Date();
     let lastDayDelta = 0;
     let moved = false;
-    
+
     setIsDragging(true);
-    
+
     const handleMove = (ev: MouseEvent | TouchEvent) => {
       ev.preventDefault();
       let currentX: number;
@@ -358,7 +358,7 @@ function SwipeableDateInput({
         onChange(clampDateStr(newDate));
       }
     };
-    
+
     const handleUp = () => {
       setIsDragging(false);
       window.removeEventListener("mousemove", handleMove);
@@ -370,13 +370,13 @@ function SwipeableDateInput({
         setShowNativeInput(true);
       }
     };
-    
+
     window.addEventListener("mousemove", handleMove, { passive: false });
     window.addEventListener("mouseup", handleUp);
     window.addEventListener("touchmove", handleMove, { passive: false });
     window.addEventListener("touchend", handleUp);
   }
-  
+
   // Native date input fallback - shown on click, hidden on blur
   if (showNativeInput) {
     return (
@@ -403,7 +403,7 @@ function SwipeableDateInput({
       />
     );
   }
-  
+
   if (!value) {
     return (
       <button
@@ -418,7 +418,7 @@ function SwipeableDateInput({
       </button>
     );
   }
-  
+
   return (
     <div
       className={cn(
@@ -477,15 +477,20 @@ export function TimelineBar({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [showRationaleModal, setShowRationaleModal] = useState(false);
-  
+
   // Date range state
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  
+
   // Drag-to-scroll state
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef(0);
   const scrollStartRef = useRef(0);
+
+  // Selection/Zoom state
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
 
   const allDays = useMemo<DayBucket[]>(() => {
     const entries = [...groupedByDay.entries()]
@@ -502,7 +507,7 @@ export function TimelineBar({
   // Filter days by selected date range
   const days = useMemo<DayBucket[]>(() => {
     if (!startDate && !endDate) return allDays;
-    
+
     return allDays.filter((day) => {
       if (startDate) {
         const start = startOfDay(parse(startDate, "yyyy-MM-dd", new Date()));
@@ -520,14 +525,14 @@ export function TimelineBar({
   const { slotWidth, trackWidth, labelStride } = useMemo(() => {
     const count = days.length || 1;
     const available = viewportWidth || 600;
-    
+
     // Distribute width evenly across all visible days to fill viewport.
     // For large datasets the slots will be very narrow (< 1px) which is fine –
     // the SVG path still renders a smooth rollercoaster and nodes shrink or
     // hide automatically.
     const slot = Math.max(MIN_SLOT_WIDTH_PX, available / count);
     const track = slot * count;
-    
+
     // Label stride adapts to available space per slot – when very dense only
     // show labels at wide intervals.
     let stride: number;
@@ -537,7 +542,7 @@ export function TimelineBar({
     else if (slot < 30) stride = Math.max(20, Math.ceil(200 / slot));
     else if (slot < 60) stride = Math.max(7, Math.ceil(80 / slot));
     else stride = Math.max(1, Math.ceil(40 / slot));
-    
+
     return { slotWidth: slot, trackWidth: Math.max(track, available), labelStride: stride };
   }, [viewportWidth, days.length]);
 
@@ -548,14 +553,14 @@ export function TimelineBar({
   useEffect(() => {
     const scrollElement = scrollContainerRef.current;
     if (!scrollElement) return;
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept keys when focused on an input, textarea, or select
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
         return;
       }
-      
+
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         scrollElement.scrollBy({ left: -slotWidth * 5, behavior: 'smooth' });
@@ -580,15 +585,26 @@ export function TimelineBar({
     };
   }, [slotWidth]);
 
-  // Mouse and touch drag-to-scroll
+  // Mouse and touch drag-to-scroll / selection
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't start drag on interactive elements or date segments
     if ((e.target as HTMLElement).closest('button, input, select, a, [data-date-segment]')) return;
-    isDraggingRef.current = true;
-    dragStartXRef.current = e.clientX;
-    scrollStartRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.style.cursor = 'grabbing';
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left + container.scrollLeft;
+
+    if (e.shiftKey) {
+      setIsSelecting(true);
+      setSelectionStart(x);
+      setSelectionEnd(x);
+    } else {
+      isDraggingRef.current = true;
+      dragStartXRef.current = e.clientX;
+      scrollStartRef.current = container.scrollLeft;
+      container.style.cursor = 'grabbing';
     }
     e.preventDefault();
   }, []);
@@ -604,10 +620,21 @@ export function TimelineBar({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDraggingRef.current || !scrollContainerRef.current) return;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      if (isSelecting) {
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left + container.scrollLeft;
+        setSelectionEnd(x);
+        return;
+      }
+
+      if (!isDraggingRef.current) return;
       const dx = e.clientX - dragStartXRef.current;
-      scrollContainerRef.current.scrollLeft = scrollStartRef.current - dx;
+      container.scrollLeft = scrollStartRef.current - dx;
     };
+
     const handleTouchMove = (e: TouchEvent) => {
       if (!isDraggingRef.current || !scrollContainerRef.current) return;
       const touch = e.touches[0];
@@ -615,8 +642,33 @@ export function TimelineBar({
       const dx = touch.clientX - dragStartXRef.current;
       scrollContainerRef.current.scrollLeft = scrollStartRef.current - dx;
     };
+
     const handleEnd = () => {
+      if (isSelecting && selectionStart !== null && selectionEnd !== null) {
+        // Calculate zoom range
+        const startX = Math.min(selectionStart, selectionEnd);
+        const endX = Math.max(selectionStart, selectionEnd);
+
+        // Only zoom if there's a significant drag
+        if (Math.abs(startX - endX) > 10) {
+          const startIndex = Math.max(0, Math.floor(startX / slotWidth));
+          const endIndex = Math.min(days.length - 1, Math.floor(endX / slotWidth));
+
+          const startDay = days[startIndex];
+          const endDay = days[endIndex];
+
+          if (startDay && endDay) {
+            setStartDate(startDay.dayKey);
+            setEndDate(endDay.dayKey);
+          }
+        }
+      }
+
       isDraggingRef.current = false;
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionEnd(null);
+
       if (scrollContainerRef.current) {
         scrollContainerRef.current.style.cursor = 'grab';
       }
@@ -662,7 +714,7 @@ export function TimelineBar({
           </motion.div>
           <span className="font-semibold">{rangeLabel}</span>
         </motion.div>
-        
+
         {/* Date range picker */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
@@ -747,321 +799,352 @@ export function TimelineBar({
               transformOrigin: 'top left',
             }}
           >
-          {/* Roller coaster path connecting the dots */}
-          <svg 
-            className="absolute top-0 left-0 pointer-events-none" 
-            width={trackWidth}
-            height={MIN_TIMELINE_HEIGHT}
-            style={{ overflow: 'visible' }}
-          >
-            <defs>
-              {/* Sentiment-based gradient: Red (negative) -> Yellow (neutral) -> Green (positive) */}
-              <linearGradient id="rollercoaster-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                {days.map((day, idx) => {
-                  // Check if all entries are image-only
-                  const allImageOnly = day.chats.every(c => c.imageOnly);
-                  
-                  let avgRating: number;
-                  if (allImageOnly) {
-                    // For image-only days, use a neutral color (rating 50)
-                    avgRating = 50;
-                  } else {
-                    // Calculate average rating (excluding image-only entries)
-                    const ratings = day.chats
-                      .filter(c => !c.imageOnly)
-                      .map(c => c.moodAnalysis?.rating ?? 50)
-                      .filter(r => r !== null);
-                    avgRating = ratings.length > 0 
-                      ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
-                      : 50;
-                  }
-                  
-                  // Convert rating to color: Red (negative) -> Yellow (neutral) -> Green (positive)
-                  let color: string;
-                  if (avgRating < 40) {
-                    const intensity = (40 - avgRating) / 40;
-                    color = `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
-                  } else if (avgRating > 60) {
-                    const intensity = (avgRating - 60) / 40;
-                    color = `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
-                  } else {
-                    const neutralPos = (avgRating - 40) / 20;
-                    color = `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
-                  }
-                  
-                  const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "0%";
-                  return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="1" />;
-                })}
-              </linearGradient>
-            </defs>
-            {days.length > 1 && (
-              <motion.path
-                d={(() => {
-                  // For rollercoaster path, use one point per day with averaged mood
-                  // Skip image-only days (they use interpolation instead)
-                  const points = days.map((day, idx) => {
-                    const x = idx * slotWidth + slotWidth / 2;
-                    
+            {/* Selection Overlay */}
+            {isSelecting && selectionStart !== null && selectionEnd !== null && (
+              <div
+                className="absolute top-0 bottom-0 bg-[var(--neon-cyan)]/20 border-x border-[var(--neon-cyan)] pointer-events-none z-30 flex items-center justify-center overflow-hidden"
+                style={{
+                  left: Math.min(selectionStart, selectionEnd),
+                  width: Math.abs(selectionStart - selectionEnd),
+                  boxShadow: "0 0 30px var(--glow-cyan)",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                <div className="text-[10px] uppercase tracking-widest text-[var(--neon-cyan)] font-bold animate-pulse">
+                  Release to Zoom
+                </div>
+              </div>
+            )}
+            {/* Roller coaster path connecting the dots */}
+            <svg
+              className="absolute top-0 left-0 pointer-events-none"
+              width={trackWidth}
+              height={MIN_TIMELINE_HEIGHT}
+              style={{ overflow: 'visible' }}
+            >
+              <defs>
+                {/* Sentiment-based gradient: Red (negative) -> Yellow (neutral) -> Green (positive) */}
+                <linearGradient id="rollercoaster-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  {days.map((day, idx) => {
                     // Check if all entries are image-only
                     const allImageOnly = day.chats.every(c => c.imageOnly);
-                    
-                    let y: number;
+
+                    let avgRating: number;
                     if (allImageOnly) {
-                      // Use interpolation for image-only days
-                      y = interpolateYPosition(day.date, allDays);
+                      // For image-only days, use a neutral color (rating 50)
+                      avgRating = 50;
                     } else {
                       // Calculate average rating (excluding image-only entries)
                       const ratings = day.chats
                         .filter(c => !c.imageOnly)
                         .map(c => c.moodAnalysis?.rating ?? 50)
                         .filter(r => r !== null);
-                      const avgRating = ratings.length > 0 
-                        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+                      avgRating = ratings.length > 0
+                        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
                         : 50;
-                      y = ratingToY(avgRating);
                     }
-                    
-                    return { x, y };
-                  });
-                  
-                  if (points.length < 2) return '';
-                  
-                  // Create smooth cubic Bézier curve through points
-                  let path = `M ${points[0]!.x} ${points[0]!.y}`;
-                  
-                  for (let i = 1; i < points.length; i++) {
-                    const prev = points[i - 1]!;
-                    const curr = points[i]!;
-                    const dx = curr.x - prev.x;
-                    const dy = Math.abs(curr.y - prev.y);
-                    
-                    const tension = dy > STEEP_THRESHOLD ? CURVE_TENSION_STEEP : CURVE_TENSION_DEFAULT;
-                    
-                    const cp1x = prev.x + dx * tension;
-                    const cp1y = prev.y;
-                    const cp2x = curr.x - dx * tension;
-                    const cp2y = curr.y;
-                    
-                    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
-                  }
-                  
-                  return path;
-                })()}
-                stroke="url(#rollercoaster-gradient)"
-                strokeWidth={Math.max(MIN_STROKE_WIDTH, Math.min(MAX_STROKE_WIDTH, slotWidth / STROKE_SLOT_RATIO))}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: Math.min(2, days.length * 0.1), ease: "easeInOut" }}
-                style={{
-                  filter: 'drop-shadow(0 0 12px rgba(255, 200, 100, 0.5)) drop-shadow(0 0 6px rgba(100, 255, 136, 0.5))',
-                }}
-              />
-            )}
-          </svg>
 
-          {/* Animated baseline with gradient */}
-          <motion.div
-            className="absolute left-0 right-0 h-[2px]"
-            style={{
-              top: COASTER_BOTTOM + 20,
-              background: "linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-pink), transparent)",
-              boxShadow: "0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple)",
-            }}
-            animate={{
-              opacity: [0.6, 1, 0.6],
-            }}
-            transition={{ duration: 3, repeat: Infinity }}
-          />
+                    // Convert rating to color: Red (negative) -> Yellow (neutral) -> Green (positive)
+                    let color: string;
+                    if (avgRating < 40) {
+                      const intensity = (40 - avgRating) / 40;
+                      color = `rgb(${255}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`;
+                    } else if (avgRating > 60) {
+                      const intensity = (avgRating - 60) / 40;
+                      color = `rgb(${Math.round(100 * (1 - intensity))}, ${255}, ${Math.round(136 * intensity)})`;
+                    } else {
+                      const neutralPos = (avgRating - 40) / 20;
+                      color = `rgb(${255}, ${Math.round(200 + 55 * neutralPos)}, ${Math.round(100 * (1 - neutralPos))})`;
+                    }
 
-          <div className="absolute left-0 top-0" style={{ width: '100%', height: MIN_TIMELINE_HEIGHT }}>
-            {days.map((day, idx) => {
-              const prevMonth = idx > 0 ? format(days[idx - 1]!.date, "yyyy-MM") : null;
-              const thisMonth = format(day.date, "yyyy-MM");
-              const isNewMonth = prevMonth !== thisMonth;
+                    const offset = days.length > 1 ? `${(idx / (days.length - 1)) * 100}%` : "0%";
+                    return <stop key={`gradient-${idx}`} offset={offset} stopColor={color} stopOpacity="1" />;
+                  })}
+                </linearGradient>
+              </defs>
+              {days.length > 1 && (
+                <motion.path
+                  d={(() => {
+                    // For rollercoaster path, use one point per day with averaged mood
+                    // Skip image-only days (they use interpolation instead)
+                    const points = days.map((day, idx) => {
+                      const x = idx * slotWidth + slotWidth / 2;
 
-              const showDayLabel =
-                idx === 0 ||
-                idx === days.length - 1 ||
-                idx % labelStride === 0 ||
-                isNewMonth;
+                      // Check if all entries are image-only
+                      const allImageOnly = day.chats.every(c => c.imageOnly);
 
-              const marks = day.chats;
+                      let y: number;
+                      if (allImageOnly) {
+                        // Use interpolation for image-only days
+                        y = interpolateYPosition(day.date, allDays);
+                      } else {
+                        // Calculate average rating (excluding image-only entries)
+                        const ratings = day.chats
+                          .filter(c => !c.imageOnly)
+                          .map(c => c.moodAnalysis?.rating ?? 50)
+                          .filter(r => r !== null);
+                        const avgRating = ratings.length > 0
+                          ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+                          : 50;
+                        y = ratingToY(avgRating);
+                      }
 
-              return (
-                <div
-                  key={day.dayKey}
-                  className="relative group"
-                  style={{ 
-                    width: slotWidth, 
-                    height: MIN_TIMELINE_HEIGHT,
-                    position: 'absolute',
-                    left: idx * slotWidth,
-                    top: 0,
+                      return { x, y };
+                    });
+
+                    if (points.length < 2) return '';
+
+                    // Create smooth cubic Bézier curve through points
+                    let path = `M ${points[0]!.x} ${points[0]!.y}`;
+
+                    for (let i = 1; i < points.length; i++) {
+                      const prev = points[i - 1]!;
+                      const curr = points[i]!;
+                      const dx = curr.x - prev.x;
+                      const dy = Math.abs(curr.y - prev.y);
+
+                      const tension = dy > STEEP_THRESHOLD ? CURVE_TENSION_STEEP : CURVE_TENSION_DEFAULT;
+
+                      const cp1x = prev.x + dx * tension;
+                      const cp1y = prev.y;
+                      const cp2x = curr.x - dx * tension;
+                      const cp2y = curr.y;
+
+                      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+                    }
+
+                    return path;
+                  })()}
+                  stroke="url(#rollercoaster-gradient)"
+                  strokeWidth={Math.max(MIN_STROKE_WIDTH, Math.min(MAX_STROKE_WIDTH, slotWidth / STROKE_SLOT_RATIO))}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: Math.min(2, days.length * 0.1), ease: "easeInOut" }}
+                  style={{
+                    filter: 'drop-shadow(0 0 12px rgba(255, 200, 100, 0.5)) drop-shadow(0 0 6px rgba(100, 255, 136, 0.5))',
                   }}
-                >
-                  {/* Month label with glow */}
-                  {isNewMonth && slotWidth > 12 ? (
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md z-20"
-                      style={{
-                        top: 8,
-                        textShadow: "0 0 10px var(--glow-cyan)",
-                        background: "rgba(0, 245, 255, 0.1)",
-                        border: "1px solid rgba(0, 245, 255, 0.3)",
-                        fontSize: Math.max(8, Math.min(12, slotWidth / 5)),
-                      }}
-                    >
-                      {format(day.date, "LLL yyyy")}
-                    </div>
-                  ) : null}
+                />
+              )}
+            </svg>
 
-                  {/* Animated tick */}
-                  {slotWidth > 4 && (
-                    <motion.div
-                      className="absolute left-1/2 -translate-x-1/2 h-3 w-[2px]"
-                      style={{
-                        top: COASTER_BOTTOM + 14,
-                        background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
-                        boxShadow: "0 0 5px var(--glow-cyan)",
-                      }}
-                      animate={{
-                        opacity: [0.5, 1, 0.5],
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                  )}
+            {/* Animated baseline with gradient */}
+            <motion.div
+              className="absolute left-0 right-0 h-[2px]"
+              style={{
+                top: COASTER_BOTTOM + 20,
+                background: "linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-pink), transparent)",
+                boxShadow: "0 0 10px var(--glow-cyan), 0 0 20px var(--glow-purple)",
+              }}
+              animate={{
+                opacity: [0.6, 1, 0.6],
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+            />
 
-                  {/* Marks positioned by mood rating for roller coaster effect */}
-                  {/* Show ONE aggregated node per day with average mood */}
-                  <div className="absolute left-1/2 -translate-x-1/2 top-0 w-full" style={{ height: MIN_TIMELINE_HEIGHT }}>
-                    <AnimatePresence initial={false}>
-                      {(() => {
-                        // Check if ALL entries for this day are image-only
-                        const allImageOnly = marks.every(c => c.imageOnly);
-                        
-                        let yPos: number;
-                        let avgRating: number;
-                        
-                        if (allImageOnly) {
-                          // Use geometric interpolation for image-only days
-                          yPos = interpolateYPosition(day.date, allDays);
-                          avgRating = 50; // Placeholder, not actually used for image-only
-                        } else {
-                          // Calculate average rating for this day (excluding image-only entries)
-                          const ratings = marks
-                            .filter(c => !c.imageOnly)
-                            .map(c => c.moodAnalysis?.rating ?? 50)
-                            .filter(r => r !== null);
-                          avgRating = ratings.length > 0 
-                            ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
-                            : 50;
-                          
-                          // Calculate Y position matching the SVG rollercoaster path
-                          yPos = ratingToY(avgRating);
-                        }
-                        
-                        const representativeChat = marks[0]!;
-                        
-                        // Create a synthetic chat object with averaged mood for display
-                        const avgChat = {
-                          ...representativeChat,
-                          moodAnalysis: representativeChat.moodAnalysis ? {
-                            ...representativeChat.moodAnalysis,
-                            rating: avgRating,
-                            description: marks.length > 1 
-                              ? `${marks.length} entries (avg)` 
-                              : representativeChat.moodAnalysis.description,
-                          } : undefined
-                        };
-                        
-                        // Render image-only entries differently
-                        // Note: We check for imageUrl to ensure we have an image to display.
-                        // If an image-only entry somehow has no imageUrl (edge case: upload failed),
-                        // it will fall through to regular node rendering with interpolated position.
-                        if (allImageOnly && representativeChat.imageUrl) {
+            <div className="absolute left-0 top-0" style={{ width: '100%', height: MIN_TIMELINE_HEIGHT }}>
+              {days.map((day, idx) => {
+                const prevMonth = idx > 0 ? format(days[idx - 1]!.date, "yyyy-MM") : null;
+                const thisMonth = format(day.date, "yyyy-MM");
+                const isNewMonth = prevMonth !== thisMonth;
+
+                const showDayLabel =
+                  idx === 0 ||
+                  idx === days.length - 1 ||
+                  idx % labelStride === 0 ||
+                  isNewMonth;
+
+                const marks = day.chats;
+
+                return (
+                  <div
+                    key={day.dayKey}
+                    className="relative group"
+                    style={{
+                      width: slotWidth,
+                      height: MIN_TIMELINE_HEIGHT,
+                      position: 'absolute',
+                      left: idx * slotWidth,
+                      top: 0,
+                    }}
+                  >
+                    {/* Month label with glow */}
+                    {isNewMonth && slotWidth > 12 ? (
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 text-[12px] font-sans tracking-[0.2em] uppercase text-[var(--neon-cyan)] font-bold whitespace-nowrap px-2 py-1 rounded-md z-20"
+                        style={{
+                          top: 8,
+                          textShadow: "0 0 10px var(--glow-cyan)",
+                          background: "rgba(0, 245, 255, 0.1)",
+                          border: "1px solid rgba(0, 245, 255, 0.3)",
+                          fontSize: Math.max(8, Math.min(12, slotWidth / 5)),
+                        }}
+                      >
+                        {format(day.date, "LLL yyyy")}
+                      </div>
+                    ) : null}
+
+                    {/* Animated tick */}
+                    {slotWidth > 4 && (
+                      <motion.div
+                        className="absolute left-1/2 -translate-x-1/2 h-3 w-[2px]"
+                        style={{
+                          top: COASTER_BOTTOM + 14,
+                          background: "linear-gradient(180deg, var(--neon-cyan), var(--neon-purple))",
+                          boxShadow: "0 0 5px var(--glow-cyan)",
+                        }}
+                        animate={{
+                          opacity: [0.5, 1, 0.5],
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    )}
+
+                    {/* Marks positioned by mood rating for roller coaster effect */}
+                    {/* Show ONE aggregated node per day with average mood */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-0 w-full" style={{ height: MIN_TIMELINE_HEIGHT }}>
+                      <AnimatePresence initial={false}>
+                        {(() => {
+                          // Check if ALL entries for this day are image-only
+                          const allImageOnly = marks.every(c => c.imageOnly);
+
+                          let yPos: number;
+                          let avgRating: number;
+
+                          if (allImageOnly) {
+                            // Use geometric interpolation for image-only days
+                            yPos = interpolateYPosition(day.date, allDays);
+                            avgRating = 50; // Placeholder, not actually used for image-only
+                          } else {
+                            // Calculate average rating for this day (excluding image-only entries)
+                            const ratings = marks
+                              .filter(c => !c.imageOnly)
+                              .map(c => c.moodAnalysis?.rating ?? 50)
+                              .filter(r => r !== null);
+                            avgRating = ratings.length > 0
+                              ? Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length)
+                              : 50;
+
+                            // Calculate Y position matching the SVG rollercoaster path
+                            yPos = ratingToY(avgRating);
+                          }
+
+                          const representativeChat = marks[0]!;
+
+                          // Create a synthetic chat object with averaged mood for display
+                          const avgChat = {
+                            ...representativeChat,
+                            moodAnalysis: representativeChat.moodAnalysis ? {
+                              ...representativeChat.moodAnalysis,
+                              rating: avgRating,
+                              description: marks.length > 1
+                                ? `${marks.length} entries (avg)`
+                                : representativeChat.moodAnalysis.description,
+                            } : undefined
+                          };
+
+                          // Render image-only entries differently
+                          // Note: We check for imageUrl to ensure we have an image to display.
+                          // If an image-only entry somehow has no imageUrl (edge case: upload failed),
+                          // it will fall through to regular node rendering with interpolated position.
+                          if (allImageOnly && representativeChat.imageUrl) {
+                            return (
+                              <div
+                                key={day.dayKey}
+                                className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2"
+                                style={{ top: yPos }}
+                              >
+                                {/* Image thumbnail node */}
+                                <motion.div
+                                  className="relative cursor-pointer"
+                                  onClick={() => {
+                                    onSelectChat?.(representativeChat.id);
+                                  }}
+                                  whileHover={{ scale: 1.2 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  style={{
+                                    width: dotPx,
+                                    height: dotPx,
+                                  }}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={representativeChat.imageUrl}
+                                    alt="Entry"
+                                    className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
+                                    style={{
+                                      width: dotPx,
+                                      height: dotPx,
+                                      boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
+                                    }}
+                                    loading="lazy"
+                                  />
+                                </motion.div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div
                               key={day.dayKey}
                               className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2"
                               style={{ top: yPos }}
                             >
-                              {/* Image thumbnail node */}
-                              <motion.div
-                                className="relative cursor-pointer"
+                              <GlowingDot
+                                chat={avgChat}
+                                isNewest={marks.some(c => c.id === newestChatId)}
+                                isHighlighted={marks.some(c => c.id === highlightChatId)}
                                 onClick={() => {
                                   onSelectChat?.(representativeChat.id);
                                 }}
-                                whileHover={{ scale: 1.2 }}
-                                whileTap={{ scale: 0.9 }}
-                                style={{
-                                  width: dotPx,
-                                  height: dotPx,
+                                onShowRationale={() => {
+                                  setSelectedChat(representativeChat);
+                                  setShowRationaleModal(true);
                                 }}
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={representativeChat.imageUrl}
-                                  alt="Entry"
-                                  className="rounded-full object-cover border-2 border-[var(--neon-cyan)]"
-                                  style={{
-                                    width: dotPx,
-                                    height: dotPx,
-                                    boxShadow: '0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3)',
-                                  }}
-                                  loading="lazy"
-                                />
-                              </motion.div>
+                                size={dotPx}
+                                yOffset={0}
+                              />
                             </div>
                           );
-                        }
-                        
-                        return (
-                          <div
-                            key={day.dayKey}
-                            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2"
-                            style={{ top: yPos }}
-                          >
-                            <GlowingDot
-                              chat={avgChat}
-                              isNewest={marks.some(c => c.id === newestChatId)}
-                              isHighlighted={marks.some(c => c.id === highlightChatId)}
-                              onClick={() => {
-                                onSelectChat?.(representativeChat.id);
-                              }}
-                              onShowRationale={() => {
-                                setSelectedChat(representativeChat);
-                                setShowRationaleModal(true);
-                              }}
-                              size={dotPx}
-                              yOffset={0}
-                            />
-                          </div>
-                        );
-                      })()}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Day label with subtle glow */}
-                  {showDayLabel && slotWidth > 10 ? (
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
-                      style={{ 
-                        top: COASTER_BOTTOM + 26,
-                        fontSize: Math.max(7, Math.min(10, slotWidth / 4)),
-                      }}
-                    >
-                      {format(day.date, isNewMonth ? "MMM d" : "d")}
+                        })()}
+                      </AnimatePresence>
                     </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+
+                    {/* Day label with subtle glow */}
+                    {showDayLabel && slotWidth > 10 ? (
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 text-[10px] font-mono text-[var(--text-secondary)] whitespace-nowrap font-semibold"
+                        style={{
+                          top: COASTER_BOTTOM + 26,
+                          fontSize: Math.max(7, Math.min(10, slotWidth / 4)),
+                        }}
+                      >
+                        {format(day.date, isNewMonth ? "MMM d" : "d")}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* Floating Reset Button */}
+        {(startDate || endDate) && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { setStartDate(""); setEndDate(""); }}
+            className="absolute bottom-6 right-6 z-40 px-4 py-2 rounded-full border border-[var(--neon-cyan)]/30 bg-[var(--bg-surface)]/80 text-[11px] uppercase tracking-widest text-[var(--neon-cyan)] font-bold backdrop-blur-xl flex items-center gap-2 shadow-[0_0_30px_rgba(0,245,255,0.2)] hover:border-[var(--neon-cyan)] hover:shadow-[0_0_30px_rgba(0,245,255,0.4)] transition-all"
+          >
+            <Sparkles className="h-3 w-3" />
+            Reset Zoom
+          </motion.button>
+        )}
       </div>
 
       {/* Navigation hint */}
