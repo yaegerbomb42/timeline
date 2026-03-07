@@ -37,14 +37,14 @@ type QueueStatus = {
   errors: number;
 };
 
-const BATCH_SIZE = 15; // Process 15 entries at a time - balances API token usage (~3-4k tokens) with processing speed
-const RATE_LIMIT_DELAY = 5000; // 5 seconds between batches to stay under ~15 RPM rate limits
-const MAX_CONSECUTIVE_FAILS = 3; // Stop auto-retrying after 3 consecutive full-batch failures
-const FETCH_TIMEOUT_MS = 90_000; // 90 seconds max for a single API call
+const BATCH_SIZE = 5; // Smaller batches return faster and distribute work better across AI buckets
+const MAX_CONCURRENCY = 8; // Process up to 8 batches in parallel
+const MAX_CONSECUTIVE_FAILS = 3;
+const FETCH_TIMEOUT_MS = 60_000; // 60 seconds is plenty for 5 entries
 
 /**
  * Hook to manage background mood analysis queue
- * Processes entries without mood analysis in batches using Gemini AI
+ * Optimized for high-concurrency parallel processing across multiple AI buckets
  */
 export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, enabled: boolean = true) {
   const [status, setStatus] = useState<QueueStatus>({
@@ -72,8 +72,6 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
         const pendingList: PendingDisplayEntry[] = [];
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
-          // Skip image-only entries (they don't need AI analysis)
-          // Count entries with text that need mood analysis or with old analysis (no Gemini fields)
           if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
             pendingCount++;
             pendingList.push({
@@ -86,9 +84,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
 
         setPendingEntries(pendingList);
 
-        // Use callback form to avoid cascading renders
         setStatus((prev) => {
-          // Only update if values actually changed
           if (prev.pending !== pendingCount || prev.total !== pendingCount + prev.processed) {
             return {
               ...prev,
@@ -105,22 +101,12 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   }, [uid, enabled]);
 
   const processBatch = useCallback(async (entries: PendingEntry[]): Promise<number> => {
-    if (!uid) {
-      console.warn("No UID available for mood analysis");
-      return 0;
-    }
+    if (!uid) return 0;
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      // Only send the API key header if the user has configured one.
-      // The server-side route falls back to process.env.GEMINI_API_KEY.
-      if (apiKey) {
-        headers["x-timeline-ai-key"] = apiKey;
-      }
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) headers["x-timeline-ai-key"] = apiKey;
 
-      // Use AbortController to prevent indefinite hangs when the API doesn't respond
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -137,20 +123,13 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       }
 
       if (!response.ok) {
+        if (response.status === 429) throw new Error("RATE_LIMITED");
         const error = await response.json();
-        console.error("Mood analysis API error:", error);
-
-        // If rate limited, throw specific error
-        if (response.status === 429) {
-          throw new Error("RATE_LIMITED");
-        }
-
         throw new Error(error.error || "Analysis failed");
       }
 
       const { results } = await response.json();
 
-      // Update Firestore with results
       let updated = 0;
       for (const result of results) {
         try {
@@ -169,7 +148,6 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
           });
           updated++;
 
-          // Add to recent results log
           const matchingEntry = entries.find(e => e.id === result.id);
           setRecentResults((prev) => {
             const newItem: QueueLogItem = {
@@ -184,7 +162,7 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
               geminiRationale: result.geminiRationale || result.rationale || "",
               timestamp: Date.now(),
             };
-            return [newItem, ...prev].slice(0, 30); // Keep most recent 30
+            return [newItem, ...prev].slice(0, 30);
           });
         } catch (updateError) {
           console.error(`Failed to update entry ${result.id}:`, updateError);
@@ -193,11 +171,9 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
 
       return updated;
     } catch (error: any) {
-      if (error.message === "RATE_LIMITED") {
-        throw error; // Re-throw to handle specially
-      }
+      if (error.message === "RATE_LIMITED") throw error;
       if (error.name === "AbortError") {
-        console.error("Mood analysis request timed out after", FETCH_TIMEOUT_MS / 1000, "seconds");
+        console.error("Mood analysis request timed out");
         return 0;
       }
       console.error("Batch processing error:", error);
@@ -206,24 +182,19 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
   }, [uid, apiKey]);
 
   const processQueue = useCallback(async () => {
-    if (!uid || !enabled || processingRef.current) {
-      return;
-    }
+    if (!uid || !enabled || processingRef.current) return;
 
     processingRef.current = true;
     abortRef.current = false;
     setStatus((prev) => ({ ...prev, processing: true }));
 
     try {
-      // Get all pending entries
       const q = query(collection(db, "users", uid, "chats"));
       const snapshot = await getDocs(q);
 
       const pending: PendingEntry[] = [];
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
-        // Skip image-only entries (they don't need AI analysis)
-        // Check for entries with text without mood analysis OR without Gemini-enhanced analysis
         if (data.text && data.text.trim() && !data.imageOnly && (!data.moodAnalysis || !data.moodAnalysis.geminiRationale)) {
           pending.push({
             id: doc.id,
@@ -235,48 +206,51 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
 
       setStatus((prev) => ({ ...prev, total: pending.length, processed: 0, errors: 0 }));
 
-      // Process in batches
-      let batchSucceeded = false;
+      // Partition into chunks
+      const chunks: PendingEntry[][] = [];
       for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-        if (abortRef.current) {
-          console.log("Queue processing aborted");
-          break;
-        }
-
-        const batch = pending.slice(i, i + BATCH_SIZE);
-
-        try {
-          const updated = await processBatch(batch);
-
-          if (updated > 0) {
-            batchSucceeded = true;
-            consecutiveFailsRef.current = 0; // Reset on any success
-          }
-
-          setStatus((prev) => ({
-            ...prev,
-            processed: prev.processed + updated,
-            errors: prev.errors + (batch.length - updated),
-          }));
-
-          // Rate limiting: wait between batches
-          if (i + BATCH_SIZE < pending.length) {
-            await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
-          }
-        } catch (error: any) {
-          if (error.message === "RATE_LIMITED") {
-            console.log("Rate limited, waiting longer before retry...");
-            setStatus((prev) => ({ ...prev, errors: prev.errors + batch.length }));
-            // Wait 10 seconds on rate limit, then continue
-            await new Promise((resolve) => setTimeout(resolve, 10000));
-          } else {
-            setStatus((prev) => ({ ...prev, errors: prev.errors + batch.length }));
-          }
-        }
+        chunks.push(pending.slice(i, i + BATCH_SIZE));
       }
 
-      if (!batchSucceeded) {
+      // Parallel Worker Pool
+      let anySucceeded = false;
+      const workQueue = [...chunks];
+      const concurrency = Math.min(workQueue.length, MAX_CONCURRENCY);
+
+      const worker = async () => {
+        while (workQueue.length > 0 && !abortRef.current) {
+          const batch = workQueue.shift();
+          if (!batch) break;
+
+          try {
+            const updated = await processBatch(batch);
+            if (updated > 0) anySucceeded = true;
+
+            setStatus((prev) => ({
+              ...prev,
+              processed: prev.processed + updated,
+              errors: prev.errors + (batch.length - updated),
+            }));
+          } catch (error: any) {
+            if (error.message === "RATE_LIMITED") {
+              // On global 429, wait briefly and retry or return to pool
+              console.log("Bucket saturation detected, backing off...");
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              workQueue.unshift(batch); // Push back to try again
+            } else {
+              setStatus((prev) => ({ ...prev, errors: prev.errors + batch.length }));
+            }
+          }
+        }
+      };
+
+      // Start parallel workers
+      await Promise.all(Array.from({ length: concurrency }).map(worker));
+
+      if (!anySucceeded && chunks.length > 0) {
         consecutiveFailsRef.current++;
+      } else {
+        consecutiveFailsRef.current = 0;
       }
     } catch (error) {
       console.error("Queue processing error:", error);
@@ -284,15 +258,11 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     } finally {
       processingRef.current = false;
       setStatus((prev) => ({ ...prev, processing: false }));
-
-      // After processing completes, check if new entries arrived during processing.
-      // If so, the onSnapshot listener will update pending count, which will trigger
-      // the auto-start effect to run again after a short delay.
     }
   }, [uid, enabled, processBatch]);
 
   const startQueue = useCallback(() => {
-    consecutiveFailsRef.current = 0; // Manual start always retries
+    consecutiveFailsRef.current = 0;
     void processQueue();
   }, [processQueue]);
 
@@ -300,14 +270,8 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
     abortRef.current = true;
   }, []);
 
-  // Auto-start processing when there are pending entries.
-  // Uses a timer ref to debounce rapid re-triggers while still reliably restarting
-  // when new entries arrive or processing completes with remaining entries.
-  // Stops auto-retrying after MAX_CONSECUTIVE_FAILS consecutive failures to avoid
-  // infinite loops when no API key is available on either client or server.
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    // Clear any pending auto-start timer when deps change
     if (autoTimerRef.current) {
       clearTimeout(autoTimerRef.current);
       autoTimerRef.current = null;
@@ -321,21 +285,16 @@ export function useMoodAnalysisQueue(uid: string | null, apiKey: string | null, 
       !processingRef.current &&
       consecutiveFailsRef.current < MAX_CONSECUTIVE_FAILS
     ) {
-      // Delay before starting to avoid rapid re-triggers after a batch completes
       autoTimerRef.current = setTimeout(() => {
         autoTimerRef.current = null;
-        // Re-check all conditions after the delay (state/refs may have changed)
         if (enabled && uid && !processingRef.current && consecutiveFailsRef.current < MAX_CONSECUTIVE_FAILS) {
           void processQueue();
         }
-      }, 2000);
+      }, 1000); // Aggressive restart
     }
 
     return () => {
-      if (autoTimerRef.current) {
-        clearTimeout(autoTimerRef.current);
-        autoTimerRef.current = null;
-      }
+      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     };
   }, [enabled, uid, status.pending, status.processing, processQueue]);
 
