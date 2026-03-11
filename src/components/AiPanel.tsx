@@ -77,7 +77,7 @@ export function AiPanel({
   const [keyEntryDismissed, setKeyEntryDismissed] = useState(false);
   const [aiMode, setAiMode] = useState<"local" | "pro">("local");
   const [webllmProgress, setWebllmProgress] = useState<string | null>(null);
-  
+
   // Chat history
   type ChatMessage = {
     id: string;
@@ -108,16 +108,24 @@ export function AiPanel({
 
   // Determine effective mode and ready state
   const effectiveMode = aiMode;
-  const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : hasKey) && !needsKey;
+
+  // Custom logic for owner: hide API key entry but allow Pro mode
+  const isOwner = userEmail === "yaeger.james42@gmail.com";
+  const ownerHasBackendKey = isOwner; // Owner uses backend Keys
+
+  const ready = hydrated && (effectiveMode === "local" ? webGPUAvailable : (hasKey || ownerHasBackendKey)) && !needsKey;
+
   const shouldShowKeyEntry =
-    hydrated && effectiveMode === "pro" && (!hasKey || needsKey) && !keyEntryDismissed;
+    hydrated && effectiveMode === "pro" && !isOwner && (!hasKey || needsKey) && !keyEntryDismissed;
+
   const shouldShowKeyHint =
-    hydrated && effectiveMode === "pro" && (!hasKey || needsKey) && keyEntryDismissed;
+    hydrated && effectiveMode === "pro" && !isOwner && (!hasKey || needsKey) && keyEntryDismissed;
+
 
   async function ask() {
     const q = query.trim();
     if (!q) return;
-    
+
     // Add user message to history
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -127,14 +135,14 @@ export function AiPanel({
     };
     setChatHistory(prev => [...prev, userMessage]);
     setQuery(""); // Clear input immediately
-    
+
     setError(null);
     setBusy(true);
     setWebllmProgress(null);
-    
+
     try {
       let context = buildTimelineContext({ months: monthIndex, chats });
-      
+
       // Detect filtered queries and add specific data
       const lowerQ = q.toLowerCase();
       if (lowerQ.includes("above 80") || lowerQ.includes("> 80") || lowerQ.includes("high mood") || lowerQ.includes("best days")) {
@@ -152,13 +160,13 @@ export function AiPanel({
         const filteredSummary = buildFilteredSummary(chats, (c) => !!(c.moodAnalysis && c.moodAnalysis.rating < threshold));
         context += `\n\nFILTERED ENTRIES (mood < ${threshold}):\n` + filteredSummary;
       }
-      
+
       if (effectiveMode === "local") {
         // Use WebLLM local model
         const response = await generateWithWebLLM(q, context, (progress) => {
           setWebllmProgress(progress.text);
         });
-        
+
         // Add assistant response to history
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
@@ -175,6 +183,7 @@ export function AiPanel({
           headers: {
             "Content-Type": "application/json",
             "x-timeline-ai-key": aiKey,
+            "x-user-email": userEmail || "",
           },
           body: JSON.stringify({ query: q, context }),
         });
@@ -192,7 +201,7 @@ export function AiPanel({
         }
         const data = (await res.json()) as { text?: string };
         const responseText = data.text?.trim() || "(No response)";
-        
+
         // Add assistant response to history
         const assistantMessage: ChatMessage = {
           id: `assistant-${Date.now()}`,
@@ -324,18 +333,18 @@ export function AiPanel({
               >
                 Save key
               </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => {
-                    setNeedsKey(false);
-                    setKeyEntryDismissed(true);
-                    setKeyDraft("");
-                    setError(null);
-                    if (webGPUAvailable) {
-                      setAiMode("local");
-                    }
-                  }}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  setNeedsKey(false);
+                  setKeyEntryDismissed(true);
+                  setKeyDraft("");
+                  setError(null);
+                  if (webGPUAvailable) {
+                    setAiMode("local");
+                  }
+                }}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--bg-surface)]/60 px-4 py-3 text-sm font-sans text-[var(--text-secondary)]",
                   "hover:text-[var(--text-primary)] hover:border-[var(--neon-cyan)] transition-colors",
@@ -356,7 +365,7 @@ export function AiPanel({
           >
             <div className="flex flex-col gap-3">
               <div>
-                Pro mode needs an API key. You can keep using Local mode or add a key when you're ready.
+                Pro mode needs an API key. You can keep using Local mode or add a key when you&apos;re ready.
               </div>
               <div className="flex flex-wrap gap-3">
                 <motion.button
@@ -439,7 +448,7 @@ export function AiPanel({
                   Pro
                 </motion.button>
               </div>
-              {aiMode === "pro" && hasKey && (
+              {aiMode === "pro" && hasKey && !isOwner && (
                 <motion.button
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -466,7 +475,7 @@ export function AiPanel({
                   <p className="text-xs mt-2">Try: &ldquo;Tell me about July&rdquo;</p>
                 </div>
               )}
-              
+
               <AnimatePresence>
                 {chatHistory.map((msg) => (
                   <motion.div
@@ -493,7 +502,7 @@ export function AiPanel({
                   </motion.div>
                 ))}
               </AnimatePresence>
-              
+
               {/* Loading indicator while thinking */}
               {busy && (
                 <motion.div
@@ -516,7 +525,7 @@ export function AiPanel({
                   </div>
                 </motion.div>
               )}
-              
+
               {/* WebLLM Progress */}
               <AnimatePresence>
                 {webllmProgress && (
@@ -531,7 +540,7 @@ export function AiPanel({
                   </motion.div>
                 )}
               </AnimatePresence>
-              
+
               {/* Error Display */}
               <AnimatePresence>
                 {error && (
@@ -548,7 +557,7 @@ export function AiPanel({
                   </motion.div>
                 )}
               </AnimatePresence>
-              
+
               {/* Scroll anchor */}
               <div ref={chatEndRef} />
             </div>
@@ -614,7 +623,7 @@ export function AiPanel({
                   📝 Week summary
                 </motion.button>
               </div>
-              
+
               <div className="flex gap-3">
                 <motion.input
                   value={query}

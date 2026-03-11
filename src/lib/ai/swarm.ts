@@ -200,9 +200,10 @@ export class SwarmEngine {
         worker.cooldownUntil = Date.now() + baseCooldown;
 
         return { text, provider: worker.provider };
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
-        const msg = error?.message || String(error);
+        const err = error as { message?: string; status?: number };
+        const msg = err?.message || String(err);
         if (error?.status === 429 || msg.includes('quota') || msg.includes('rate limit') || msg.includes('insufficient_quota')) {
           worker.currentCooldownMultiplier = Math.min(worker.currentCooldownMultiplier * 2, 8);
           console.warn(`[SwarmEngine] Worker ${worker.id} saturated/out-of-quota. Doubling cooldown (${worker.currentCooldownMultiplier}x)`);

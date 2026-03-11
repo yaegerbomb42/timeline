@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 import { GEMINI_MODEL } from "@/lib/ai/config";
+
+import { runSwarm } from "@/lib/ai/swarm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,8 +26,25 @@ export async function POST(req: Request) {
   if (!q) return NextResponse.json({ error: "Missing query." }, { status: 400 });
 
   const headerKey = req.headers.get("x-timeline-ai-key")?.trim();
+  const userEmail = req.headers.get("x-user-email")?.trim();
+  const isOwner = userEmail === "yaeger.james42@gmail.com";
+
   // Filter out empty string, "null", and "undefined" string values
   const validHeaderKey = headerKey && headerKey !== "null" && headerKey !== "undefined" ? headerKey : null;
+
+  // For owner, we ALWAYS use the swarm (multi-key pool)
+  if (isOwner) {
+    try {
+      const prompt = `${ctx}\n\nUSER QUESTION: ${q}\n\nAnswer:`;
+      const result = await runSwarm(prompt, { temperature: 0.35 });
+      return NextResponse.json({ text: result.text });
+    } catch (swarmErr: unknown) {
+      console.error("[Swarm Error]:", swarmErr);
+      // Fallback if swarm fails? For owner, swarm is the priority.
+      // Continue to regular flow as fallback if needed.
+    }
+  }
+
   const apiKey = validHeaderKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "Missing AI key." }, { status: 400 });
 
@@ -37,9 +56,11 @@ export async function POST(req: Request) {
     });
 
     const config = {
+      /* 
       thinkingConfig: {
         thinkingLevel: ThinkingLevel.HIGH,
       },
+      */
       temperature: 0.35,
       topK: 24,
       topP: 0.85,
@@ -136,20 +157,21 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ text });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as any;
     // Log error for debugging (server-side only)
     console.error("[AI Route Error]:", {
-      message: error?.message,
-      name: error?.name,
-      status: error?.status,
-      code: error?.code,
-      stack: error?.stack?.split("\n").slice(0, 5).join("\n"),
+      message: err?.message,
+      name: err?.name,
+      status: err?.status,
+      code: err?.code,
+      stack: err?.stack?.split("\n").slice(0, 5).join("\n"),
     });
 
-    const errorMessage = error?.message || String(error);
-    const errorCode = error?.code || error?.status;
+    const errorMessage = err?.message || String(err);
+    const errorCode = err?.code || err?.status;
     const errorDetails = errorMessage.slice(0, 1800);
-    
+
     // Check for specific API errors
     if (errorCode === 404 || errorMessage?.includes("not found")) {
       return NextResponse.json(
@@ -163,11 +185,10 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
-    
+
     return NextResponse.json(
       { error: "AI request failed.", details: errorDetails },
       { status: 500 },
     );
   }
 }
-
